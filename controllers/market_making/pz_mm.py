@@ -275,6 +275,7 @@ class PZMMController(MarketMakingControllerBase):
             hma_fast=self.config.hma_fast,
         )
         price_multiplier = price_multiplier.iloc[-1]
+        candles = candles.copy()
         candles["spread_multiplier"] = natr
         candles["reference_price"] = candles["close"] * (1 + price_multiplier)
         self.processed_data = {
@@ -294,10 +295,11 @@ class PZMMController(MarketMakingControllerBase):
         # NATR of the underlying asset, so it can be used for high and low volatility assets
 
         # TP = 1x NATR
-        self.take_profit = self.config.tp_natr_factor * self.processed_data["spread_multiplier"]
+        self.take_profit = self.config.tp_natr_factor * Decimal(str(self.processed_data["spread_multiplier"]))
+
 
         # SL = 1x NATR
-        self.stop_loss = self.config.sl_natr_factor * self.processed_data["spread_multiplier"]
+        self.stop_loss = self.config.sl_natr_factor * Decimal(str(self.processed_data["spread_multiplier"]))
 
         return PositionExecutorConfig(
             timestamp=self.market_data_provider.time(),
