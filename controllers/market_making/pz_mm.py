@@ -11,13 +11,9 @@ from hummingbot.strategy_v2.controllers.market_making_controller_base import (
     MarketMakingControllerConfigBase,
 )
 from hummingbot.strategy_v2.executors.position_executor.data_types import (
-    PositionExecutorConfig,
+    PositionExecutorConfig, TrailingStop
 )
 from hummingbot.core.data_type.common import TradeType
-
-# FIXME: remove Take Profit and Stop Loss from config
-# instead use a "factor" as input for TP and SL. Factored to NATR
-
 
 class PZMMControllerConfig(MarketMakingControllerConfigBase):
     controller_name = "pz_mm"
@@ -52,72 +48,24 @@ class PZMMControllerConfig(MarketMakingControllerConfigBase):
             prompt=lambda mi: "Enter the trading pair for the candles data, leave empty to use the same trading pair as the connector: ",
         ),
     )
-    interval: str = Field(
-        default="1m",
-        client_data=ClientFieldData(
-            prompt=lambda mi: "Enter the candle interval (e.g., 1m, 5m, 1h, 1d): ",
-            prompt_on_new=False,
-        ),
-    )
+    interval: str = "1m"
 
-    hma_very_slow: int = Field(
-        default=50,
-        client_data=ClientFieldData(
-            prompt=lambda mi: "Enter the HMA very slow length: ",
-            prompt_on_new=True,
-        ),
-    )
-    hma_slow: int = Field(
-        default=20,
-        client_data=ClientFieldData(
-            prompt=lambda mi: "Enter the HMA slow length: ", prompt_on_new=True
-        ),
-    )
-    hma_fast: int = Field(
-        default=10,
-        client_data=ClientFieldData(
-            prompt=lambda mi: "Enter the HMA fast length: ", prompt_on_new=True
-        ),
-    )
-    rsi_length: int = Field(
-        default=9,
-        client_data=ClientFieldData(
-            prompt=lambda mi: "Enter the stoch RSI length: ", prompt_on_new=True
-        ),
-    )
+    # NOTE: Those properties inherited!
+    # buy_amounts_pct: List[Decimal] = [0.01]
+    # sell_amounts_pct: List[Decimal] = [0.01]
 
-    stoch_rsi_smoothing: int = Field(
-        default=3,
-        client_data=ClientFieldData(
-            prompt=lambda mi: "Enter the Stoch RSI smoothing length: ",
-            prompt_on_new=True,
-        ),
-    )
-    stoch_rsi_length: int = Field(
-        default=9,
-        client_data=ClientFieldData(
-            prompt=lambda mi: "Enter the Stoch RSI length: ",
-            prompt_on_new=True,
-        ),
-    )
-    natr_length: int = Field(
-        default=14,
-        client_data=ClientFieldData(
-            prompt=lambda mi: "Enter the NATR length: ", prompt_on_new=True
-        ),
-    )
-    tp_natr_factor: Decimal = Field(
-        default=0.5,
-        client_data=ClientFieldData(
-            prompt=lambda mi: "Enter the TP NATR Factor : ", prompt_on_new=True
-        ),
-    )
-    sl_natr_factor: Decimal = Field(
-        default=0.5,
-        client_data=ClientFieldData(
-            prompt=lambda mi: "Enter the SL NATR Factor : ", prompt_on_new=True
-        ),
-    )
+    hma_very_slow: int = 50
+    hma_slow: int = 20
+    hma_fast: int = 10
+    rsi_length: int = 9
+    stoch_rsi_smoothing: int = 3
+    stoch_rsi_length: int = 9
+    natr_length: int = 14
+    tp_natr_factor: Decimal = 0.5
+    sl_natr_factor: Decimal = 0.5
+    ts_activation_natr_factor: Decimal = 0.1 
+    ts_delta_natr_factor: Decimal = 0.02
+
 
 
     @validator("candles_connector", pre=True, always=True)
@@ -298,12 +246,22 @@ class PZMMController(MarketMakingControllerBase):
         # I want to make the take profit and stop loss dynamic, so it's based on the
         # NATR of the underlying asset, so it can be used for high and low volatility assets
 
+
+        # natr = Decimal(self.processed_data[f"NATR_{self.config.natr_length}"]) / Decimal(100.0)
+        natr = Decimal(self.processed_data["spread_multiplier"]) / Decimal(100.0)
+
         # TP = 1x NATR
-        self.take_profit = self.config.tp_natr_factor * Decimal(str(self.processed_data["spread_multiplier"]))
+        self.config.take_profit = self.config.tp_natr_factor * natr
 
 
         # SL = 1x NATR
-        self.stop_loss = self.config.sl_natr_factor * Decimal(str(self.processed_data["spread_multiplier"]))
+        self.config.stop_loss = self.config.sl_natr_factor * natr
+
+        # Trailing Stop 
+        self.config.trailing_stop=TrailingStop(
+            activation_price=Decimal(self.config.ts_activation_natr_factor * natr), 
+            trailing_delta=Decimal(self.config.ts_delta_natr_factor * natr)
+        )
 
         return PositionExecutorConfig(
             timestamp=self.market_data_provider.time(),
@@ -321,12 +279,27 @@ class PZMMController(MarketMakingControllerBase):
         """
         Get the spread and amount in quote for a given level id.
         """
-        # print("CAN YOU READ ME!?")
         level = self.get_level_from_level_id(level_id)
         trade_type = self.get_trade_type_from_level_id(level_id)
         spreads, amounts_quote = self.config.get_spreads_and_amounts_in_quote(trade_type)
+        # spreads = [1.0, 1.5]
         reference_price = Decimal(self.processed_data["reference_price"])
+
         spread_in_pct = Decimal(spreads[int(level)]) * Decimal(self.processed_data["spread_multiplier"])
+        # spread_multiplier e.g. = 0.0025 (0.25% NATR)
+        # spread_in_pct = 1 * 0.0025
+
         side_multiplier = Decimal("-1") if trade_type == TradeType.BUY else Decimal("1")
         order_price = reference_price * (1 + side_multiplier * spread_in_pct)
+
+        # print (spreads, amounts_quote)
+        
+        # print(
+        #     f"{trade_type}_{level}",
+        #     f"{reference_price:.4f}",
+        #     f"{spread_in_pct:.4f}",
+        #     f"{order_price:.4f}",
+        #     f"{Decimal(amounts_quote[int(level)]) / order_price:.4f}"
+        # )
+
         return order_price, Decimal(amounts_quote[int(level)]) / order_price
