@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import List
+from typing import List, Tuple
 
 import pandas_ta as ta  # noqa: F401
 from pydantic import Field, validator
@@ -13,6 +13,7 @@ from hummingbot.strategy_v2.controllers.market_making_controller_base import (
 from hummingbot.strategy_v2.executors.position_executor.data_types import (
     PositionExecutorConfig,
 )
+from hummingbot.core.data_type.common import TradeType
 
 # FIXME: remove Take Profit and Stop Loss from config
 # instead use a "factor" as input for TP and SL. Factored to NATR
@@ -52,7 +53,7 @@ class PZMMControllerConfig(MarketMakingControllerConfigBase):
         ),
     )
     interval: str = Field(
-        default="5m",
+        default="1m",
         client_data=ClientFieldData(
             prompt=lambda mi: "Enter the candle interval (e.g., 1m, 5m, 1h, 1d): ",
             prompt_on_new=False,
@@ -139,6 +140,9 @@ class PZMMController(MarketMakingControllerBase):
     """
 
     def __init__(self, config: PZMMControllerConfig, *args, **kwargs):
+        import sys
+        sys.stdout.write("debug info\n")
+        sys.stdout.flush()
         self.config = config
         self.max_records = (
             max(
@@ -277,7 +281,7 @@ class PZMMController(MarketMakingControllerBase):
         price_multiplier = price_multiplier.iloc[-1]
         candles = candles.copy()
         candles["spread_multiplier"] = natr
-        candles["reference_price"] = candles["close"] * (1 + price_multiplier)
+        candles["reference_price"] = candles["close"] # * (1 + price_multiplier)
         self.processed_data = {
             "reference_price": Decimal(candles["reference_price"].iloc[-1]),
             "spread_multiplier": Decimal(candles["spread_multiplier"].iloc[-1]),
@@ -312,3 +316,17 @@ class PZMMController(MarketMakingControllerBase):
             leverage=self.config.leverage,
             side=trade_type,
         )
+    
+    def get_price_and_amount(self, level_id: str) -> Tuple[Decimal, Decimal]:
+        """
+        Get the spread and amount in quote for a given level id.
+        """
+        # print("CAN YOU READ ME!?")
+        level = self.get_level_from_level_id(level_id)
+        trade_type = self.get_trade_type_from_level_id(level_id)
+        spreads, amounts_quote = self.config.get_spreads_and_amounts_in_quote(trade_type)
+        reference_price = Decimal(self.processed_data["reference_price"])
+        spread_in_pct = Decimal(spreads[int(level)]) * Decimal(self.processed_data["spread_multiplier"])
+        side_multiplier = Decimal("-1") if trade_type == TradeType.BUY else Decimal("1")
+        order_price = reference_price * (1 + side_multiplier * spread_in_pct)
+        return order_price, Decimal(amounts_quote[int(level)]) / order_price
