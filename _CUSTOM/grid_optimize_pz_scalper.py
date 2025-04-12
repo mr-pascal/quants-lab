@@ -13,12 +13,6 @@ import datetime
 from controllers.directional_trading.pz_scalper import PZScalperControllerConfig
 getcontext().prec = 4  # set desired precision
 
-
-#####
-backtest_resolution = "1m"
-start_date = datetime.datetime(2025, 3, 29)
-end_date = datetime.datetime(2025, 3, 30)
-
 # maker_fee = Decimal(0.0002)
 taker_fee = Decimal(0.0006)
 # Worst case, MKT entry and Stop via MKT order
@@ -136,7 +130,7 @@ def run_optimizer_worker(trials: int, start_date, end_date, trading_pair, interv
         storage_name=storage_name,
         load_cached_data=True,
         root_path=root_path,
-        resolution=backtest_resolution)
+        resolution="1m")
 
     start_date_day = start_date.strftime('%Y-%m-%d')
     end_date_day = end_date.strftime('%Y-%m-%d')
@@ -157,29 +151,32 @@ if __name__ == "__main__":
         "db_pass": os.getenv("OPTUNA_PASSWORD", "admin"),
         "database_name": os.getenv("OPTUNA_DB", "optimization_database")
     }
-    trading_pairs = ["BTC-USDT", "WLD-USDT"] #, "ETH-USDT", "XRP-USDT", "BNB-USDT", "SOL-USDT"]
+    trading_pairs = ["BTC-USDT", "WLD-USDT", "ETH-USDT", "XRP-USDT", "BNB-USDT", "SOL-USDT"]
     intervals = [
-        #"5m", 
+        "5m", 
         "15m", "30m"]
+    start_date = datetime.datetime(2025, 1, 1)
+    end_date = datetime.datetime(2025, 3, 30)
+
+    total_trials = 150
+    num_processes = 8 # multiprocessing.cpu_count()
+    trials_per_proc = total_trials // num_processes
 
 
     for trading_pair in trading_pairs:
         for interval in intervals:
-            total_trials = 150
-            num_processes = multiprocessing.cpu_count()
-            trials_per_proc = total_trials // num_processes
+            print(f"Starting optimization for {trading_pair} @ {interval}")
+            
+            # Prepare a task for each process, which collectively run all trials in parallel
+            tasks = [
+                (trials_per_proc, start_date, end_date, trading_pair, interval, kwargs)
+                for _ in range(num_processes)
+            ]
 
-            processes = []
-            for _ in range(num_processes):
-                p = multiprocessing.Process(target=run_optimizer_worker,
-                                            args=(trials_per_proc, start_date, end_date, trading_pair, interval, kwargs))
-                p.start()
-                processes.append(p)
+            # Create a pool for the current pair/interval combination
+            with multiprocessing.Pool(processes=num_processes) as pool:
+                # pool.starmap blocks until all processes have finished their tasks
+                pool.starmap(run_optimizer_worker, tasks)
 
-            for p in processes:
-                p.join()
-            pass
-
-
-
+            print(f"Finished optimization for {trading_pair} @ {interval}\n")
 
