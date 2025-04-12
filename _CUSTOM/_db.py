@@ -21,7 +21,7 @@ cur = conn.cursor()
 #     WHERE key = 'config'
 #     LIMIT 1;
 # """)
-study_id = "870"
+study_id = "774"
 
 query = f"""
 SELECT
