@@ -28,6 +28,7 @@ class BacktestingConfig(BaseModel):
     config: ControllerConfigBase
     start: int
     end: int
+    trade_cost: float
 
 
 class BaseStrategyConfigGenerator(ABC):
@@ -343,6 +344,7 @@ class StrategyOptimizer:
                 start=backtesting_config.start,
                 end=backtesting_config.end,
                 backtesting_resolution=self.resolution,
+                trade_cost=backtesting_config.trade_cost if backtesting_config.trade_cost else 0.0006
             )
             strategy_analysis = backtesting_result.results
 

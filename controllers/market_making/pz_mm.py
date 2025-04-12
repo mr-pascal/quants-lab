@@ -54,17 +54,28 @@ class PZMMControllerConfig(MarketMakingControllerConfigBase):
     # buy_amounts_pct: List[Decimal] = [0.01]
     # sell_amounts_pct: List[Decimal] = [0.01]
 
-    hma_very_slow: int = 50
+    # hma_very_slow: int = 50
     hma_slow: int = 20
     hma_fast: int = 10
-    rsi_length: int = 9
+    hma_diff_ma: int = 9
+
+    # rsi_length: int = 9
     stoch_rsi_smoothing: int = 3
     stoch_rsi_length: int = 9
     natr_length: int = 14
     tp_natr_factor: Decimal = 0.5
     sl_natr_factor: Decimal = 0.5
-    ts_activation_natr_factor: Decimal = 0.1 
-    ts_delta_natr_factor: Decimal = 0.02
+    # ts_activation_natr_factor: Decimal = 0.1 
+    # ts_delta_natr_factor: Decimal = 0.02
+
+    # ByBit
+    # Taker Fee: 0.0550%
+    # Maker Fee: 0.0200%
+    taker_fee = 0.00055
+    maker_fee = 0.0002
+    total_fees = maker_fee + taker_fee
+    buffer = 0.0005
+    minimum_spread_per_side = ((total_fees) + buffer) / 2
 
 
 
@@ -88,16 +99,17 @@ class PZMMController(MarketMakingControllerBase):
     """
 
     def __init__(self, config: PZMMControllerConfig, *args, **kwargs):
-        import sys
-        sys.stdout.write("debug info\n")
-        sys.stdout.flush()
+        # import sys
+        # sys.stdout.write("debug info\n")
+        # sys.stdout.flush()
         self.config = config
         self.max_records = (
             max(
-                config.hma_very_slow,
+                # config.hma_very_slow,
                 config.hma_slow,
                 config.hma_fast,
-                config.rsi_length,
+                config.hma_diff_ma,
+                # config.rsi_length,
                 config.natr_length,
             )
             + 100
@@ -117,12 +129,15 @@ class PZMMController(MarketMakingControllerBase):
         self,
         candles: pd.DataFrame,
         natr_length: int,
-        rsi_length: int,
+        # rsi_length: int,
         stoch_rsi_length: int,
         stoch_rsi_smoothing: int,
-        hma_very_slow: int,
+        # hma_very_slow: int,
+        
         hma_slow: int,
         hma_fast: int,
+        hma_diff_ma: int,
+
     ) -> tuple[pd.Series, pd.Series]:
         natr = (
             ta.natr(
@@ -133,8 +148,8 @@ class PZMMController(MarketMakingControllerBase):
             )
             / 100
         )
-        rsi = ta.rsi(candles["close"], length=rsi_length)
-        rsi_wma = ta.wma(rsi, length=rsi_length)
+        # rsi = ta.rsi(candles["close"], length=rsi_length)
+        # rsi_wma = ta.wma(rsi, length=rsi_length)
 
         stochrsi = ta.stochrsi(
             candles["close"],
@@ -153,11 +168,11 @@ class PZMMController(MarketMakingControllerBase):
             f"STOCHRSId_{stoch_rsi_length}_{stoch_rsi_length}_{stoch_rsi_smoothing}_{stoch_rsi_smoothing}"
         ]
 
-        hma_very_slow_output = ta.hma(
-            candles["close"],
-            length=hma_very_slow,
-            offset=0,
-        )
+        # hma_very_slow_output = ta.hma(
+        #     candles["close"],
+        #     length=hma_very_slow,
+        #     offset=0,
+        # )
         hma_slow_output = ta.hma(
             candles["close"],
             length=hma_slow,
@@ -168,45 +183,57 @@ class PZMMController(MarketMakingControllerBase):
             length=hma_fast,
             offset=0,
         )
-        hma_very_slow_signal = candles["close"] - hma_very_slow_output
-        hma_very_slow_signal = hma_very_slow_signal.apply(
-            lambda x: 1 if x > 0 else -1
-        )
+        # hma_very_slow_signal = candles["close"] - hma_very_slow_output
+        # hma_very_slow_signal = hma_very_slow_signal.apply(
+        #     lambda x: 1 if x > 0 else -1
+        # )
         hma_slow_signal = candles["close"] - hma_slow_output
         hma_slow_signal = hma_slow_signal.apply(lambda x: 1 if x > 0 else -1)
         hma_fast_signal = candles["close"] - hma_fast_output
         hma_fast_signal = hma_fast_signal.apply(lambda x: 1 if x > 0 else -1)
 
+        diff_fast = candles["close"] - hma_fast_output
+        diff_slow = candles["close"] - hma_slow_output
+        diff_total = (diff_fast + diff_slow) / candles["close"] * 100
+ 
+    
+        ema_out = ta.ema(close=diff_total, length=self.config.hma_diff_ma)
+
         k_over_d = k / d
         k_over_d_signal = k_over_d.apply(lambda x: 1 if x > 0 else -1)
-        max_price_shift = natr * 0.8
         srsi_over_signal = d.apply(
             lambda x: -1 if x > 80 else (1 if x < 20 else 0)
         )
 
-        rsi_wma_signal = (rsi - rsi_wma).apply(lambda x: 1 if x > 0 else -1)
-        rsi_over_signal = rsi.apply(
-            lambda x: -1 if x > 70 else (1 if x < 30 else 0)
-        )
-
+        # rsi_wma_signal = (rsi - rsi_wma).apply(lambda x: 1 if x > 0 else -1)
+        # rsi_over_signal = rsi.apply(
+        #     lambda x: -1 if x > 70 else (1 if x < 30 else 0)
+        # )
+        hma_diff_signal_df = ema_out / diff_total
+        hma_diff_signal = hma_diff_signal_df.apply(lambda x: 1 if x > 0 else -1)
+        max_price_shift = natr * 0.8
         signal_multipliers = [
+            hma_diff_signal,
             # HMA
-            hma_very_slow_signal,
+            # hma_very_slow_signal,
             hma_slow_signal,
             hma_fast_signal,
             # SRSI
             k_over_d_signal,
             srsi_over_signal,
-            # RSI
-            rsi_wma_signal,
-            rsi_over_signal,
+            # # RSI
+            # rsi_wma_signal,
+            # rsi_over_signal,
         ]
+        # print(signal_multipliers)
         # Create even weights to the signals
         signal_multiplier = sum(
             signal / len(signal_multipliers) for signal in signal_multipliers
         )
+        # signal_multiplier = 1
         price_multiplier = signal_multiplier * max_price_shift
-        return price_multiplier, natr
+
+        return price_multiplier, natr, signal_multiplier
 
     async def update_processed_data(self):
         candles = self.market_data_provider.get_candles_df(
@@ -216,24 +243,30 @@ class PZMMController(MarketMakingControllerBase):
             max_records=self.max_records,
         )
 
-        price_multiplier, natr = self.get_price_multiplier(
+        price_multiplier_df, natr, signal_multiplier = self.get_price_multiplier(
             candles=candles,
             natr_length=self.config.natr_length,
-            rsi_length=self.config.rsi_length,
+            # rsi_length=self.config.rsi_length,
             stoch_rsi_length=self.config.stoch_rsi_length,
             stoch_rsi_smoothing=self.config.stoch_rsi_smoothing,
-            hma_very_slow=self.config.hma_very_slow,
+            # hma_very_slow=self.config.hma_very_slow,
+            hma_diff_ma=self.config.hma_diff_ma,
             hma_slow=self.config.hma_slow,
             hma_fast=self.config.hma_fast,
         )
-        price_multiplier = price_multiplier.iloc[-1]
+        price_multiplier = price_multiplier_df.iloc[-1]
         candles = candles.copy()
         candles["spread_multiplier"] = natr
-        candles["reference_price"] = candles["close"] # * (1 + price_multiplier)
+        candles["price_multiplier"] = price_multiplier
+        candles["signal_multiplier"] = signal_multiplier
+
+        candles["reference_price"] = candles["close"] * (1 + price_multiplier)
         self.processed_data = {
             "reference_price": Decimal(candles["reference_price"].iloc[-1]),
             "spread_multiplier": Decimal(candles["spread_multiplier"].iloc[-1]),
             "features": candles,
+
+
         }
 
     def get_executor_config(
@@ -251,17 +284,22 @@ class PZMMController(MarketMakingControllerBase):
         natr = Decimal(self.processed_data["spread_multiplier"]) / Decimal(100.0)
 
         # TP = 1x NATR
-        self.config.take_profit = self.config.tp_natr_factor * natr
+        self.config.take_profit = self.config.minimum_spread_per_side 
+        # max(
+        #     Decimal(self.config.tp_natr_factor) * natr, 
+        #     self.config.minimum_spread_per_side
+        # )
 
 
         # SL = 1x NATR
-        self.config.stop_loss = self.config.sl_natr_factor * natr
+        self.config.stop_loss = Decimal(self.config.sl_natr_factor) * natr
 
         # Trailing Stop 
-        self.config.trailing_stop=TrailingStop(
-            activation_price=Decimal(self.config.ts_activation_natr_factor * natr), 
-            trailing_delta=Decimal(self.config.ts_delta_natr_factor * natr)
-        )
+        self.config.trailing_stop=None 
+        # TrailingStop(
+        #     activation_price=Decimal(Decimal(self.config.ts_activation_natr_factor) * natr), 
+        #     trailing_delta=Decimal(Decimal(self.config.ts_delta_natr_factor) * natr)
+        # )
 
         return PositionExecutorConfig(
             timestamp=self.market_data_provider.time(),
@@ -280,14 +318,27 @@ class PZMMController(MarketMakingControllerBase):
         Get the spread and amount in quote for a given level id.
         """
         level = self.get_level_from_level_id(level_id)
+        # level = 0 | 1 | 2 ...
         trade_type = self.get_trade_type_from_level_id(level_id)
         spreads, amounts_quote = self.config.get_spreads_and_amounts_in_quote(trade_type)
         # spreads = [1.0, 1.5]
         reference_price = Decimal(self.processed_data["reference_price"])
 
+        # spread_multipler === NATR
+
         spread_in_pct = Decimal(spreads[int(level)]) * Decimal(self.processed_data["spread_multiplier"])
         # spread_multiplier e.g. = 0.0025 (0.25% NATR)
         # spread_in_pct = 1 * 0.0025
+        # print(spread_in_pct, self.config.minimum_spread_per_side)
+        spread_in_pct = max(
+            Decimal(self.config.minimum_spread_per_side),
+            Decimal(0.25) * Decimal(self.processed_data["spread_multiplier"])
+        )
+
+        # spread_in_pct = max(
+        #     Decimal(self.config.minimum_spread_per_side), # minimum the spread distance
+        #     Decimal(self.processed_data["spread_multiplier"])
+        # )
 
         side_multiplier = Decimal("-1") if trade_type == TradeType.BUY else Decimal("1")
         order_price = reference_price * (1 + side_multiplier * spread_in_pct)

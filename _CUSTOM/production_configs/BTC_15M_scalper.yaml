@@ -1,0 +1,30 @@
+# Controller configuration
+connector_name: "binance_perpetual"
+trading_pair: "BTC-USDT"
+interval: "15m"
+backtesting_resolution: "1m"
+
+# Doesn't matter
+cooldown_time: 1 # Doesn't matter
+take_profit: 5 # Disable
+stop_loss: 5 # Disable
+
+# General
+total_amount_quote: 1000
+max_executors_per_side: 1
+
+# Indicator Values
+ema_fast: 30
+ema_slow: 70
+srsi_smoothing: 4
+srsi_length: 12
+rsi_ma_length: 6
+hma_diff_ma_length: 6
+hma_fast: 10
+hma_slow: 40
+natr_length: 13
+
+# Triple Barrier
+time_limit: 900
+tp_natr_factor: 0.75
+sl_natr_factor: 2.5

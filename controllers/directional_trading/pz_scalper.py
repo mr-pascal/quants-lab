@@ -11,11 +11,47 @@ from hummingbot.strategy_v2.controllers.directional_trading_controller_base impo
 )
 from hummingbot.strategy_v2.executors.position_executor.data_types import PositionExecutorConfig, TripleBarrierConfig, \
     TrailingStop
-from hummingbot.strategy_v2.models.executor_actions import ExecutorAction, StopExecutorAction
+# from hummingbot.strategy_v2.models.executor_actions import ExecutorAction, StopExecutorAction
 from pydantic import Field, validator
 
-from core.features.candles.peak_analyzer import PeakAnalyzer
-from hummingbot.strategy_v2.models.executors_info import ExecutorInfo
+# from core.features.candles.peak_analyzer import PeakAnalyzer
+# from hummingbot.strategy_v2.models.executors_info import ExecutorInfo
+
+"""
+Strategy description
+Long Entry:
+- HMA_Diff > HMA_DIFF_EMA
+- HMA Crossover
+- SRSI = Green
+- SRSI < 50
+- RSI_MA = Green
+- MAYBE: "close > ema1 > ema2"
+
+Short Entry:
+- HMA_Diff < HMA_DIFF_EMA
+- HMA Crossover
+- SRSI = Red
+- SRSI > 50
+- RSI_MA = Red
+- MAYGE: "close < ema1 < ema2"
+
+Take Profit:
+- Based on NATR (maybe 0.5x?)
+
+Stop Loss:
+- Based on NATR (maybe 2.0x?)
+
+Trailing Stop:
+- -> REMOVE
+
+
+To Backtest:
+- TP_NATR_FACTOR
+- SL_NATR_FACTOR
+"""
+
+
+
 
 
 class PZScalperControllerConfig(DirectionalTradingControllerConfigBase):
@@ -32,15 +68,21 @@ class PZScalperControllerConfig(DirectionalTradingControllerConfigBase):
             prompt_on_new=False))
     
     # Indicator inputs
+    ema_fast: int = 50
+    ema_slow: int = 100
+    srsi_smoothing: int = 3
+    srsi_length: int = 9
+    rsi_ma_length: int  = 9
     hma_fast: int = 20
     hma_slow : int = 50
+    hma_diff_ma_length: int = 9
     natr_length: int = 14
 
     # Factor inputs
     tp_natr_factor: Decimal = 1.0
     sl_natr_factor: Decimal = 3.0
-    ts_activation_natr_factor: Decimal = 1
-    ts_delta_natr_factor: Decimal = 0.5
+    # ts_activation_natr_factor: Decimal = 1
+    # ts_delta_natr_factor: Decimal = 0.5
 
 
     @validator("candles_connector", pre=True, always=True)
@@ -64,6 +106,12 @@ class PZScalperController(DirectionalTradingControllerBase):
             config.hma_fast,
             config.hma_slow,
             config.natr_length,
+            config.ema_slow,
+            config.ema_fast,
+            config.srsi_length,
+            config.srsi_smoothing,
+            config.rsi_ma_length,
+            config.hma_diff_ma_length
             ) + 20
         if len(self.config.candles_config) == 0:
             self.config.candles_config = [CandlesConfig(
@@ -80,52 +128,52 @@ class PZScalperController(DirectionalTradingControllerBase):
                                                       interval=self.config.interval,
                                                       max_records=self.max_records)
         
-        # close = df["close"]
+        close = df["close"]
         
-        # Add indicators
+        # Add indicators to Dataframe
+        df.ta.ema(length=self.config.ema_fast, append=True)
+        df.ta.ema(length=self.config.ema_slow, append=True)
         df.ta.hma(length=self.config.hma_fast, append=True)
         df.ta.hma(length=self.config.hma_slow, append=True)
         df.ta.natr(length=self.config.natr_length, append=True)
-        # df.ta.stochrsi(close=close, length=self.config.srsi_length, rsi_length=self.config.srsi_length, k=self.config.srsi_smoothing, d=self.config.srsi_smoothing, mamode="sma", append=True)
+        df.ta.stochrsi(close=close, length=self.config.srsi_length, rsi_length=self.config.srsi_length, k=self.config.srsi_smoothing, d=self.config.srsi_smoothing, mamode="sma", append=True)
+        df.ta.rsi(close=close, length=self.config.rsi_ma_length, append=True)
+        df.ta.wma(close=df[f"RSI_{self.config.rsi_ma_length}"], length=self.config.rsi_ma_length, append=True)
+        df[f"HMA_DIFF"] = df["close"] - df[f"HMA_{self.config.hma_fast}"] - df[f"HMA_{self.config.hma_slow}"]
+        df.ta.ema(close=df[f"HMA_DIFF"], length= self.config.hma_diff_ma_length, append=True)
 
-        # k = df[f"STOCHRSIk_{self.config.srsi_length}_{self.config.srsi_length}_{self.config.srsi_smoothing}_{self.config.srsi_smoothing}"]
-        # d = df[f"STOCHRSId_{self.config.srsi_length}_{self.config.srsi_length}_{self.config.srsi_smoothing}_{self.config.srsi_smoothing}"]
+        # Get Dataframe values
+        rsi = df[f"RSI_{self.config.rsi_ma_length}"]
+        rsi_ma = df[f"WMA_{self.config.rsi_ma_length}"]
+        k = df[f"STOCHRSIk_{self.config.srsi_length}_{self.config.srsi_length}_{self.config.srsi_smoothing}_{self.config.srsi_smoothing}"]
+        d = df[f"STOCHRSId_{self.config.srsi_length}_{self.config.srsi_length}_{self.config.srsi_smoothing}_{self.config.srsi_smoothing}"]
+        ema_fast = df[f"EMA_{self.config.ema_fast}"]
+        ema_slow = df[f"EMA_{self.config.ema_slow}"]
         hma_fast = df[f"HMA_{self.config.hma_fast}"]
         hma_slow = df[f"HMA_{self.config.hma_slow}"]
+        hma_diff = df[f"HMA_DIFF"]
+        hma_diff_ema = df[f"EMA_{self.config.hma_diff_ma_length}"]
 
-        # Add shifts
-        df[f"HMA_{self.config.hma_fast}_1"] = hma_fast.shift(1)
-        df[f"HMA_{self.config.hma_slow}_1"] = hma_slow.shift(1)
-        df["close_1"] = df["close"].shift(1)
-        # df[f"STOCHRSIk_{self.config.srsi_length}_{self.config.srsi_length}_{self.config.srsi_smoothing}_{self.config.srsi_smoothing}_1"] = k.shift(1)
-        # df[f"STOCHRSId_{self.config.srsi_length}_{self.config.srsi_length}_{self.config.srsi_smoothing}_{self.config.srsi_smoothing}_1"] = d.shift(1)
-
-
-        hma_fast_1 = df[f"HMA_{self.config.hma_fast}_1"]
-        hma_slow_1 = df[f"HMA_{self.config.hma_slow}_1"]
-        # close_1 = df["close_1"]
-        # k_1 = df[f"STOCHRSIk_{self.config.srsi_length}_{self.config.srsi_length}_{self.config.srsi_smoothing}_{self.config.srsi_smoothing}_1"]
-        # d_1 = df[f"STOCHRSId_{self.config.srsi_length}_{self.config.srsi_length}_{self.config.srsi_smoothing}_{self.config.srsi_smoothing}_1"]
-       
-
-        # TODO: add übergeordneter Trend?
-  
-        # long_hma = close > hma_fast
-        # short_hma = close < hma_fast
-        long_crossover = (hma_fast > hma_slow) & (hma_fast_1 < hma_slow_1)
-        short_crossover = (hma_fast < hma_slow) & (hma_fast_1 > hma_slow_1) 
-
-
-        # TODO: Add DIFF between HMA, they should get bigger
-
-
-
-        long_condition = long_crossover
-        short_condition = short_crossover
-
+        # Long condition
+        hma_diff_over_hma_diff_ema = hma_diff > hma_diff_ema
+        srsi_green = k > d
+        srsi_not_overbought = d < 50
+        rsi_ma_green = rsi > rsi_ma
+        close_over_emas = (close > ema_fast) & (ema_fast > ema_slow)
+        hma_bullish_crossover = (hma_fast > hma_slow) & (hma_fast.shift(1) < hma_slow.shift(1))
+        long_condition = hma_diff_over_hma_diff_ema & srsi_green & srsi_not_overbought & rsi_ma_green  & close_over_emas & hma_bullish_crossover
         
 
-        df["signal"] = 0
+        # Short Condition
+        hma_diff_below_hma_diff_ema = hma_diff < hma_diff_ema
+        srsi_red = k < d
+        srsi_not_oversold = d > 50
+        rsi_ma_red = rsi < rsi_ma
+        close_below_emas = (close < ema_fast) & (ema_fast < ema_slow)
+        hma_bearish_crossover = (hma_fast < hma_slow) & (hma_fast.shift(1) > hma_slow.shift(1))
+        short_condition = hma_diff_below_hma_diff_ema & srsi_red & srsi_not_oversold & rsi_ma_red  & close_below_emas & hma_bearish_crossover
+
+        df.loc[:, "signal"] = 0
         df.loc[long_condition, "signal"] = 1
         df.loc[short_condition, "signal"] = -1
 
@@ -142,12 +190,10 @@ class PZScalperController(DirectionalTradingControllerBase):
 
         # SL = Factor * NATR
         self.config.stop_loss = self.config.sl_natr_factor * natr
-
-        self.config.trailing_stop=TrailingStop(
-            activation_price=Decimal(self.config.ts_activation_natr_factor * natr), 
-            trailing_delta=Decimal(self.config.ts_delta_natr_factor * natr)
-        )
+        # TP = Factor * NATR
         self.config.take_profit = self.config.tp_natr_factor * natr
+
+        self.config.trailing_stop= None
 
         return PositionExecutorConfig(
             timestamp=self.market_data_provider.time(),
