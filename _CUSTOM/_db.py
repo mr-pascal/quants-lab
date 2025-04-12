@@ -21,9 +21,9 @@ cur = conn.cursor()
 #     WHERE key = 'config'
 #     LIMIT 1;
 # """)
+study_id = "870"
 
-
-query = """
+query = f"""
 SELECT
   t.trial_id,
   tv.value,
@@ -31,7 +31,7 @@ SELECT
 FROM trials t
 JOIN trial_values tv ON t.trial_id = tv.trial_id
 JOIN trial_user_attributes tua ON t.trial_id = tua.trial_id
-WHERE t.study_id = 582
+WHERE t.study_id = {study_id}
   AND tua.key = 'config'
   AND tv.value > 0
   ORDER BY value DESC
