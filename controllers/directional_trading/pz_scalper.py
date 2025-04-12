@@ -128,6 +128,7 @@ class PZScalperController(DirectionalTradingControllerBase):
                                                       interval=self.config.interval,
                                                       max_records=self.max_records)
         
+        df = df.copy()
         close = df["close"]
         
         # Add indicators to Dataframe
