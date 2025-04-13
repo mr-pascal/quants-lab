@@ -3,19 +3,15 @@ from typing import List
 
 import pandas_ta as ta  # noqa: F401
 from hummingbot.client.config.config_data_types import ClientFieldData
-from hummingbot.core.data_type.common import TradeType, OrderType
+from hummingbot.core.data_type.common import TradeType
 from hummingbot.data_feed.candles_feed.data_types import CandlesConfig
 from hummingbot.strategy_v2.controllers.directional_trading_controller_base import (
     DirectionalTradingControllerBase,
     DirectionalTradingControllerConfigBase,
 )
-from hummingbot.strategy_v2.executors.position_executor.data_types import PositionExecutorConfig, TripleBarrierConfig, \
-    TrailingStop
-# from hummingbot.strategy_v2.models.executor_actions import ExecutorAction, StopExecutorAction
+from hummingbot.strategy_v2.executors.position_executor.data_types import PositionExecutorConfig
 from pydantic import Field, validator
 
-# from core.features.candles.peak_analyzer import PeakAnalyzer
-# from hummingbot.strategy_v2.models.executors_info import ExecutorInfo
 
 class PZScalperControllerConfig(DirectionalTradingControllerConfigBase):
     controller_name = "pz_scalper"
