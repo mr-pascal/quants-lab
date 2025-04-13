@@ -17,43 +17,6 @@ from pydantic import Field, validator
 # from core.features.candles.peak_analyzer import PeakAnalyzer
 # from hummingbot.strategy_v2.models.executors_info import ExecutorInfo
 
-"""
-Strategy description
-Long Entry:
-- HMA_Diff > HMA_DIFF_EMA
-- HMA Crossover
-- SRSI = Green
-- SRSI < 50
-- RSI_MA = Green
-- MAYBE: "close > ema1 > ema2"
-
-Short Entry:
-- HMA_Diff < HMA_DIFF_EMA
-- HMA Crossover
-- SRSI = Red
-- SRSI > 50
-- RSI_MA = Red
-- MAYGE: "close < ema1 < ema2"
-
-Take Profit:
-- Based on NATR (maybe 0.5x?)
-
-Stop Loss:
-- Based on NATR (maybe 2.0x?)
-
-Trailing Stop:
-- -> REMOVE
-
-
-To Backtest:
-- TP_NATR_FACTOR
-- SL_NATR_FACTOR
-"""
-
-
-
-
-
 class PZScalperControllerConfig(DirectionalTradingControllerConfigBase):
     controller_name = "pz_scalper"
     candles_config: List[CandlesConfig] = []
@@ -81,9 +44,6 @@ class PZScalperControllerConfig(DirectionalTradingControllerConfigBase):
     # Factor inputs
     tp_natr_factor: Decimal = 1.0
     sl_natr_factor: Decimal = 3.0
-    # ts_activation_natr_factor: Decimal = 1
-    # ts_delta_natr_factor: Decimal = 0.5
-
 
     @validator("candles_connector", pre=True, always=True)
     def set_candles_connector(cls, v, values):
