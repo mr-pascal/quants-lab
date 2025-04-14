@@ -41,7 +41,7 @@ class PZMMConfigGenerator(BaseStrategyConfigGenerator):
         # stop_loss = 5  #trial.suggest_float("stop_loss", 0.01, 0.05, step=0.01)
         # trailing_stop_activation_price = 1.0
         # trailing_stop_trailing_delta = 0.05
-        cooldown_time = 1 #trial.suggest_int("cooldown_time", 60, 60 * 5, step=60)
+        cooldown_time = get_time_limit_step(interval) #trial.suggest_int("cooldown_time", 60, 60 * 5, step=60)
 
         # General
         total_amount_quote = 1000
