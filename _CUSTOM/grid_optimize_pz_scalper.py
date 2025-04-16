@@ -15,8 +15,8 @@ getcontext().prec = 4  # set desired precision
 
 # maker_fee = Decimal(0.0002)
 taker_fee = Decimal(0.0006)
-# Worst case, MKT entry and Stop via MKT order
-trade_cost: Decimal = 2*taker_fee
+# Worst case, MKT entry and Stop via MKT order + slippage
+trade_cost: Decimal = 3*taker_fee
 #+ maker_fee
 
 def get_time_limit_step(input):
@@ -152,15 +152,21 @@ if __name__ == "__main__":
         "db_pass": os.getenv("OPTUNA_PASSWORD", "admin"),
         "database_name": os.getenv("OPTUNA_DB", "optimization_database")
     }
-    trading_pairs = ["BTC-USDT", "WLD-USDT", "ETH-USDT", "XRP-USDT", "BNB-USDT", "SOL-USDT"]
+    trading_pairs = [
+        # "BTC-USDT", "WLD-USDT", "ETH-USDT", "XRP-USDT", "BNB-USDT", 
+        "SOL-USDT"]
     intervals = [
         # "5m", 
-        "15m", "30m"]
-    start_date = datetime.datetime(2025, 1, 1)
-    end_date = datetime.datetime(2025, 3, 30)
+        "15m",
+          "30m"
+          ]
+    # start_date = datetime.datetime(2025, 1, 1)
+    # end_date = datetime.datetime(2025, 3, 30)
+    start_date = datetime.datetime(2024, 1, 1)
+    end_date = datetime.datetime(2025, 1, 1)
 
-    total_trials = 150
-    num_processes = 8 # multiprocessing.cpu_count()
+    total_trials = 100
+    num_processes = 10 # multiprocessing.cpu_count()
     trials_per_proc = total_trials // num_processes
 
 

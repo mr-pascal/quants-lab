@@ -41,6 +41,8 @@ The sharpe ratio (objective metric)
 
 The parameters for each strategy configuration tested
 
+Drawdowns, PnL (%), number of positions, etc
+
 Your task is to:
 
 Analyze the parameters for robustness and stability (e.g., clustering, performance plateaus, sensitivity)
