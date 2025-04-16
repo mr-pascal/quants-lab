@@ -1,6 +1,12 @@
 import psycopg2
 import json
 
+## TO BE EDITED
+study_id = "910"
+fields_to_extract = ["ema_fast","ema_slow", "srsi_smoothing", "srsi_length",  "rsi_ma_length", "hma_diff_ma_length","hma_slow", "hma_fast", "natr_length","time_limit", "tp_natr_factor", "sl_natr_factor", ]
+###############
+
+
 # --- Update these with your actual DB credentials ---
 DB_CONFIG = {
     'dbname': 'optimization_database',
@@ -13,15 +19,6 @@ DB_CONFIG = {
 # Connect to the database
 conn = psycopg2.connect(**DB_CONFIG)
 cur = conn.cursor()
-
-# Query configs
-# cur.execute("""
-#     SELECT trial_id, value_json
-#     FROM trial_user_attributes
-#     WHERE key = 'config'
-#     LIMIT 1;
-# """)
-study_id = "774"
 
 query = f"""
 SELECT
@@ -41,32 +38,22 @@ WHERE t.study_id = {study_id}
 cur.execute(query)
 
 
-fields_to_extract = ["ema_fast","ema_slow", "srsi_smoothing", "srsi_length",  "rsi_ma_length", "hma_diff_ma_length","hma_slow", "hma_fast", "natr_length","time_limit", "tp_natr_factor", "sl_natr_factor", ]
 
 
 parameters_list = []
 # Process each row
 for trial_id, value, raw_value_json in cur.fetchall():
     try:
-        # If the value is an escaped JSON string (e.g. '{"ema_fast": 30, ...}')
-        # psycopg2 may already return it as a string
         parsed_json = json.loads(json.loads(raw_value_json))
 
         # print(parsed_json)
         parameters = {key: parsed_json.get(key) for key in fields_to_extract}
         parameters["sharpe"] = value
         parameters["trial_id"] = trial_id
-        # print(f"Trial {trial_id} → {parameters}")
-
-        # print(parameters)
         parameters_list.append(parameters)
-        # print(f"Trial {trial_id} → ema_fast: {parsed_json.get('ema_fast')}, ema_slow: {parsed_json.get('ema_slow')}")
     except Exception as e:
         print(f"[!] Failed to parse trial {trial_id}: {e}")
 
-
-# print(parameters_list)
-from collections import OrderedDict
 
 def deduplicate_with_float_tolerance(parameters_list, precision=5):
     def normalize_value(val):

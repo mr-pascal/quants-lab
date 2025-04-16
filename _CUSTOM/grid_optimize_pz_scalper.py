@@ -59,7 +59,6 @@ class PZMMConfigGenerator(BaseStrategyConfigGenerator):
         # stop_loss = 5  #trial.suggest_float("stop_loss", 0.01, 0.05, step=0.01)
         # trailing_stop_activation_price = 1.0
         # trailing_stop_trailing_delta = 0.05
-        cooldown_time = 1 #trial.suggest_int("cooldown_time", 60, 60 * 5, step=60)
 
         # General
         total_amount_quote = 1000
@@ -79,6 +78,8 @@ class PZMMConfigGenerator(BaseStrategyConfigGenerator):
         # Triple Barrier
 
         time_limit = trial.suggest_int("time_limit", get_time_limit_step(self.interval), get_time_limit_step(self.interval) * 10, step=get_time_limit_step(self.interval))
+        cooldown_time = get_time_limit_step(self.interval)
+
         tp_natr_factor = trial.suggest_float("tp_natr_factor", 0.25, 3, step=0.25)
         sl_natr_factor = trial.suggest_float("sl_natr_factor", 0.5, 3, step=0.5)
         # ts_activation_natr_factor = trial.suggest_float("ts_activation_natr_factor", 0.25, 1, step=0.25)
@@ -153,7 +154,7 @@ if __name__ == "__main__":
     }
     trading_pairs = ["BTC-USDT", "WLD-USDT", "ETH-USDT", "XRP-USDT", "BNB-USDT", "SOL-USDT"]
     intervals = [
-        "5m", 
+        # "5m", 
         "15m", "30m"]
     start_date = datetime.datetime(2025, 1, 1)
     end_date = datetime.datetime(2025, 3, 30)

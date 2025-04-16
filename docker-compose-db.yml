@@ -29,17 +29,17 @@ services:
     networks:
       - mongodb_network
 
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "8081:80"  # ✅ makes pgAdmin available at localhost:8081
-    restart: unless-stopped
-    networks:
-      - backend  # ⬅️ re-enabled
+  # pgadmin:
+  #   image: dpage/pgadmin4
+  #   container_name: pgadmin
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@admin.com
+  #     PGADMIN_DEFAULT_PASSWORD: admin
+  #   ports:
+  #     - "8081:80"  # ✅ makes pgAdmin available at localhost:8081
+  #   restart: unless-stopped
+  #   networks:
+  #     - backend  # ⬅️ re-enabled
 
 networks:
   mongodb_network:
