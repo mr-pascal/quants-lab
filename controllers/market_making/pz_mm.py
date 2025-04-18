@@ -55,8 +55,8 @@ class PZMMControllerConfig(MarketMakingControllerConfigBase):
     # sell_amounts_pct: List[Decimal] = [0.01]
 
     # hma_very_slow: int = 50
-    hma_slow: int = 20
     hma_fast: int = 10
+    hma_slow: int = 20
     hma_diff_ma: int = 9
 
     # rsi_length: int = 9

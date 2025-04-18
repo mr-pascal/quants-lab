@@ -23,33 +23,7 @@ import datetime
 from controllers.directional_trading.pz_scalper import PZScalperControllerConfig
 
 """
-
-TODO: reduce parameters to max 6!
-
-Steps:
-1. Create optimizations (200 Trials) based on 6 months (Training set)
-2. Backtest the top X trials on the next 3 months (Test set)
-3. Redo Steps 1-2 and shift each by 1 month, do it 6 times. -> "Time-Based Cross Validation (TBCV)"
-4. "Keep only those that perform well across multiple splits. This helps filter out those that only work for a specific period (overfitted)."
-5. Use DBSCAN to find stable/robust cluster combinations
-5.1 Pick the median/mean parameter set of the best-performing cluster, not just the single best.
-
-
-
-
-{
-    sharpe: 1,
-    net_pnl: 0.2,
-    drawdown: 0.1,
-    trade_count: 100,
-    param_1: 1,
-    param_2: 2,
-    param_3: 3,
-    param_4: 4,
-}
-
-
-
+TODO: reduce parameters to max 6
 """
 
 ### GLOBALS
@@ -163,69 +137,69 @@ class PZMMConfigGenerator(BaseStrategyConfigGenerator):
 
 
 
-def run_optimizer_worker(trials: int, start_date:datetime.datetime, end_date:datetime.datetime, trading_pair:str, interval:str) -> int:
-    import asyncio
-    from core.backtesting.optimizer import StrategyOptimizer
-    config_generator = PZMMConfigGenerator(
-        start_date=start_date, 
-        end_date=end_date,
-        trading_pair=trading_pair,
-        interval=interval
-        )
+# def run_optimizer_worker(trials: int, start_date:datetime.datetime, end_date:datetime.datetime, trading_pair:str, interval:str) -> int:
+#     import asyncio
+#     from core.backtesting.optimizer import StrategyOptimizer
+#     config_generator = PZMMConfigGenerator(
+#         start_date=start_date, 
+#         end_date=end_date,
+#         trading_pair=trading_pair,
+#         interval=interval
+#         )
 
-    storage_name = StrategyOptimizer.get_storage_name(
-            engine="postgres",
-            **DB_CONFIG)
-    optimizer = StrategyOptimizer(
-        storage_name=storage_name,
-        load_cached_data=True,
-        root_path=root_path,
-        resolution="1m")
+#     storage_name = StrategyOptimizer.get_storage_name(
+#             engine="postgres",
+#             **DB_CONFIG)
+#     optimizer = StrategyOptimizer(
+#         storage_name=storage_name,
+#         load_cached_data=True,
+#         root_path=root_path,
+#         resolution="1m")
 
-    start_date_day = start_date.strftime('%Y-%m-%d')
-    end_date_day = end_date.strftime('%Y-%m-%d')
-    study = asyncio.run(optimizer.optimize(
-        study_name = f"pz_scalper_{trading_pair}_{interval}_{start_date_day}_{end_date_day}",
-        config_generator=config_generator,
-        n_trials=trials,
-    ))
-    return study._study_id
+#     start_date_day = start_date.strftime('%Y-%m-%d')
+#     end_date_day = end_date.strftime('%Y-%m-%d')
+#     study = asyncio.run(optimizer.optimize(
+#         study_name = f"pz_scalper_{trading_pair}_{interval}_{start_date_day}_{end_date_day}",
+#         config_generator=config_generator,
+#         n_trials=trials,
+#     ))
+#     return study._study_id
 
-def create_optimizations(trading_pair: str, interval: str, start_date: datetime.datetime, end_date: datetime.datetime, num_trials: int, num_processes: int) -> int:
-    """
-    Run optuna optimizations and save to database
+# def create_optimizations(trading_pair: str, interval: str, start_date: datetime.datetime, end_date: datetime.datetime, num_trials: int, num_processes: int) -> int:
+#     """
+#     Run optuna optimizations and save to database
 
-    Args:
-        trading_pair (str): The trading pair to test, e.g. "SOL-USDT"
-        interval (str): The interval to test on, e.g. "5m", "15m", "30m"
-        start_date (datetime.datetime): The start date of the backtesting period.
-        end_date (datetime.datetime): The end date of the backtesting period.
-        num_trials (int): The number of trials to run
-        num_processes (int): The number of processes to start on the system
-    Returns:
-        int: The ID of the study
+#     Args:
+#         trading_pair (str): The trading pair to test, e.g. "SOL-USDT"
+#         interval (str): The interval to test on, e.g. "5m", "15m", "30m"
+#         start_date (datetime.datetime): The start date of the backtesting period.
+#         end_date (datetime.datetime): The end date of the backtesting period.
+#         num_trials (int): The number of trials to run
+#         num_processes (int): The number of processes to start on the system
+#     Returns:
+#         int: The ID of the study
 
-    """
+#     """
    
-    trials_per_proc = num_trials // num_processes
+#     trials_per_proc = num_trials // num_processes
 
-    print(f"Starting optimization for {trading_pair} @ {interval}")
+#     print(f"Starting optimization for {trading_pair} @ {interval}")
     
-    # Prepare a task for each process, which collectively run all trials in parallel
-    tasks = [
-        (trials_per_proc, start_date, end_date, trading_pair, interval)
-        for _ in range(num_processes)
-    ]
+#     # Prepare a task for each process, which collectively run all trials in parallel
+#     tasks = [
+#         (trials_per_proc, start_date, end_date, trading_pair, interval)
+#         for _ in range(num_processes)
+#     ]
 
-    study_id = None
-    # Create a pool for the current pair/interval combination
-    with multiprocessing.Pool(processes=num_processes) as pool:
-        # pool.starmap blocks until all processes have finished their tasks
-        my_list = pool.starmap(run_optimizer_worker, tasks)
-        study_id = my_list[0]
+#     study_id = None
+#     # Create a pool for the current pair/interval combination
+#     with multiprocessing.Pool(processes=num_processes) as pool:
+#         # pool.starmap blocks until all processes have finished their tasks
+#         my_list = pool.starmap(run_optimizer_worker, tasks)
+#         study_id = my_list[0]
 
-    print(f"Finished optimization for {trading_pair} @ {interval}\n")
-    return study_id
+#     print(f"Finished optimization for {trading_pair} @ {interval}\n")
+#     return study_id
 
 def fetch_trials(study_id: int):
     """
@@ -424,7 +398,7 @@ def generate_controller_config(df):
     # FIXME: get controller_name, trading_pair and interval as input!
     connector_name = "binance_perpetual"
     trading_pair = "XRP-USDT"
-    interval = "15m"
+    interval = "30m"
 
     # Don't matter
     cooldown_time = get_time_limit_step(interval) #60 * 15
@@ -548,21 +522,26 @@ async def main():
     whole_start_date= train_start_date
     whole_end_date= test_end_date
 
-    num_trials = 100
-    num_processors = 8 #multiprocessing.cpu_count()
+    # num_trials = 100
+    # num_processors = 8 #multiprocessing.cpu_count()
 
-    study_id = create_optimizations("XRP-USDT", "15m", train_start_date, train_end_date, num_trials, num_processors)
+    # study_id = create_optimizations("XRP-USDT", "15m", train_start_date, train_end_date, num_trials, num_processors)
 
   
+    study_id = 1025
     # FIXME: create check for study_id != NONE
     trials = fetch_trials(study_id)
+
+    # Only trades over 100 occurences per year sound reasonable in terms of
+    # statistically significant
+    trials = [t for t in trials if t["total_positions"] > 100] # TODO: could be part of the SQL Query
 
     df_trials = pd.DataFrame(trials)
 
     optimal_configuration = cluster_data(df_trials)
 
 
-    print(optimal_configuration)
+    # print(optimal_configuration)
 
     optimal_controller_configuration = generate_controller_config(optimal_configuration)
 
