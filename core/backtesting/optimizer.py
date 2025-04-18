@@ -225,6 +225,7 @@ class StrategyOptimizer:
         study = self._create_study(study_name, load_if_exists=load_if_exists)
         logger.info("About to start optimizing...")
         await self._optimize_async(study, config_generator, n_trials=n_trials)
+        return study
 
     async def optimize_custom_configs(self, study_name: str, config_generator: Type[BaseStrategyConfigGenerator],
                                       load_if_exists: bool = True):

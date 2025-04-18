@@ -31,10 +31,9 @@ JOIN trial_values tv ON t.trial_id = tv.trial_id
 JOIN trial_user_attributes tua ON t.trial_id = tua.trial_id
 WHERE t.study_id = {study_id}
   AND tua.key IN ('config', 'total_positions', 'accuracy_long', 'accuracy_short', 'max_drawdown_pct', 'net_pnl')
-  AND tv.value > 0
   ORDER BY value DESC
 """
-#  AND tv.value > 1.0
+#  AND tv.value > 1.0 # Sharpe ratio
 
 cur.execute(query)
 

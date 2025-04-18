@@ -136,7 +136,7 @@ def run_optimizer_worker(trials: int, start_date, end_date, trading_pair, interv
     start_date_day = start_date.strftime('%Y-%m-%d')
     end_date_day = end_date.strftime('%Y-%m-%d')
     asyncio.run(optimizer.optimize(
-        study_name = f"pz_scalper_{trading_pair}_{interval}_{trade_cost}_{start_date_day}_{end_date_day}",
+        study_name = f"pz_scalper_{trading_pair}_{interval}_{start_date_day}_{end_date_day}",
         config_generator=config_generator,
         n_trials=trials,
     ))
@@ -153,7 +153,11 @@ if __name__ == "__main__":
         "database_name": os.getenv("OPTUNA_DB", "optimization_database")
     }
     trading_pairs = [
-        # "BTC-USDT", "WLD-USDT", "ETH-USDT", "XRP-USDT", "BNB-USDT", 
+        # "BTC-USDT", 
+        "WLD-USDT", 
+        # "ETH-USDT", 
+        "XRP-USDT",
+        #  "BNB-USDT", 
         "SOL-USDT"]
     intervals = [
         # "5m", 

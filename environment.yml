@@ -7,6 +7,8 @@ dependencies:
   - sqlalchemy=1.4
   - libcxx
   - pip
+  - matplotlib # ✅ added
+  - seaborn # ✅ added
   - pip:
       - hummingbot==20250220
       - numpy==1.26.4
