@@ -4,7 +4,7 @@ import sys
 import warnings
 import asyncio
 
-warnings.filterwarnings("ignore")
+# warnings.filterwarnings("ignore")
 
 root_path = os.path.abspath(os.path.join(os.getcwd(), '../'))
 sys.path.append(root_path)
