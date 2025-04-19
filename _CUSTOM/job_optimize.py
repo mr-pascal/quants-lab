@@ -141,7 +141,6 @@ def run_optimizer_worker(trials: int, start_date, end_date, trading_pair, interv
     ))
 
 import multiprocessing
-import datetime
 
 if __name__ == "__main__":
 
@@ -164,14 +163,14 @@ if __name__ == "__main__":
 
     # Convert to datetime if they are date objects
     if isinstance(start_date_str, datetime.date):
-        start_date = datetime.combine(start_date_str, datetime.min.time())
+        start_date = datetime.datetime.combine(start_date_str, datetime.datetime.min.time())
     else:
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+        start_date = datetime.datetime.strptime(start_date_str, "%Y-%m-%d")
 
     if isinstance(end_date_str, datetime.date):
-        end_date = datetime.combine(end_date_str, datetime.min.time())
+        end_date = datetime.datetime.combine(end_date_str, datetime.datetime.min.time())
     else:
-        end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+        end_date = datetime.datetime.strptime(end_date_str, "%Y-%m-%d")
 
     # Extract candle interval
     candle_intervals = config['candle_intervals']
