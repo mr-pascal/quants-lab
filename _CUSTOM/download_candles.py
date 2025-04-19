@@ -35,7 +35,7 @@ async def main():
     DAYS = 700
     # Download Data
     BATCH_CANDLES_REQUEST = 1
-    SLEEP_REQUEST = 1
+    SLEEP_REQUEST = 0.25
 
     all_candles = {
         interval: await clob.get_candles_batch_last_days(CONNECTOR_NAME, trading_pairs, interval, DAYS, BATCH_CANDLES_REQUEST,
