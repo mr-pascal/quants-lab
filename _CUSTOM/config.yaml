@@ -1,0 +1,22 @@
+trading_pairs:
+  # - BTC-USDT
+  # - ETH-USDT
+  # - LTC-USDT
+  - XRP-USDT
+  # - ADA-USDT
+  # - SOL-USDT
+  # - BNB-USDT
+  # - WLD-USDT
+timeframe:
+  start: 2025-03-01
+  end: 2025-03-30
+candle_intervals:
+  # - 5m
+  # - 15m
+  - 30m
+db:
+  host: localhost
+  port: 5432
+  user: admin
+  password: admin
+  database: optimization_database
