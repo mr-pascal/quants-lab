@@ -207,8 +207,8 @@ if __name__ == "__main__":
     # start_date = datetime.datetime(2024, 1, 1)
     # end_date = datetime.datetime(2025, 1, 1)
 
-    total_trials = 10
-    num_processes = multiprocessing.cpu_count() - 1
+    total_trials = 200
+    num_processes = multiprocessing.cpu_count()
     trials_per_proc = total_trials // num_processes
 
 
