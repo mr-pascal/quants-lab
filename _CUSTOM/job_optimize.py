@@ -146,13 +146,13 @@ import datetime
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="A optimizer script")
-    parser.add_argument("job", help="The file path to the job file")
+    parser.add_argument("config", help="The file path to the config file")
 
     args = parser.parse_args()
-    job_file_path = args.job
+    config_path = args.config
 
     # Load YAML file
-    with open(job_file_path, "r") as file:
+    with open(config_path, "r") as file:
         config = yaml.safe_load(file)
 
     # Extract trading pair (only the uncommented one)
