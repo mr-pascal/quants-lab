@@ -44,4 +44,4 @@ async def main():
     clob.dump_candles_cache(root_path)
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())
