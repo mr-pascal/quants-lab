@@ -1,7 +1,6 @@
 # This is necessary to recognize the modules
 import os
 import sys
-from decimal import Decimal
 import warnings
 import asyncio
 
@@ -19,15 +18,21 @@ async def main():
     # Constants
     CONNECTOR_NAME = "binance_perpetual"
     INTERVALS = [
-        
-        # "1m", "5m", "15m", 
+        "1m", 
+        "5m",
+        "15m", 
         "30m"
-        ]
+    ]
     trading_pairs = [
-        # "BTC-USDT", "WLD-USDT", "ETH-USDT", "XRP-USDT", "BNB-USDT",
-                    "SOL-USDT"]
+        "BTC-USDT", 
+        "WLD-USDT", 
+        "ETH-USDT", 
+        "XRP-USDT", 
+        "BNB-USDT",
+        "SOL-USDT"
+    ]
 
-    DAYS = 2
+    DAYS = 700
     # Download Data
     BATCH_CANDLES_REQUEST = 1
     SLEEP_REQUEST = 1
