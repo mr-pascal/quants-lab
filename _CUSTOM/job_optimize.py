@@ -51,7 +51,7 @@ class PZMMConfigGenerator(BaseStrategyConfigGenerator):
     async def generate_config(self, trial) -> BacktestingConfig:
 
         # Controller configuration
-        connector_name = "binance_perpetual"
+        connector_name = "binance_perpetual" # TODO: get from job file
 
         # Don't matter
         # take_profit = 5 # trial.suggest_float("take_profit", 0.01, 0.03, step=0.01)
@@ -208,7 +208,7 @@ if __name__ == "__main__":
     # end_date = datetime.datetime(2025, 1, 1)
 
     total_trials = 200
-    num_processes = multiprocessing.cpu_count()
+    num_processes = multiprocessing.cpu_count() - 1
     trials_per_proc = total_trials // num_processes
 
 
