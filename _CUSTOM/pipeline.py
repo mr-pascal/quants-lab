@@ -489,7 +489,7 @@ async def test_optimal_controller_configuration(
     """
     # FIXME: also backtest the whole dataset, the train dataset and the test dataset
     from core.backtesting import BacktestingEngine
-
+    # FIXME: run in parallel, each in a process
     backtesting = BacktestingEngine(root_path=root_path, load_cached_data=True)
     print("Start backtesting for WHOLE dataset...")
     whole_backtesting_result = await backtesting.run_backtesting(config, int(whole_start_date.timestamp()), int(whole_end_date.timestamp()), "1m", trade_cost=float(trade_cost))
@@ -528,7 +528,7 @@ async def main():
     # study_id = create_optimizations("XRP-USDT", "15m", train_start_date, train_end_date, num_trials, num_processors)
 
   
-    study_id = 1025
+    study_id = 163
     # FIXME: create check for study_id != NONE
     trials = fetch_trials(study_id)
 
