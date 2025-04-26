@@ -10,7 +10,7 @@ import argparse
 from core.backtesting.optimizer import BacktestingConfig, BaseStrategyConfigGenerator
 from decimal import Decimal, getcontext
 import datetime
-from controllers.directional_trading.pz_scalper import PZScalperControllerConfig
+from controllers.directional_trading.pz_ema_ribbon_trend import PZEmaRibbonTrendControllerConfig
 getcontext().prec = 4  # set desired precision
 
 # maker_fee = Decimal(0.0002)
@@ -64,29 +64,20 @@ class PZMMConfigGenerator(BaseStrategyConfigGenerator):
         max_executors_per_side = 1
        
         # Indicator Values
-        ema_fast = trial.suggest_int("ema_fast", 20, 70, step = 10)
-        ema_slow = trial.suggest_int("ema_slow", 50, 120, step = 10)
-        srsi_smoothing: int = trial.suggest_int("srsi_smoothing", 3, 6, step = 1)
-        srsi_length: int = trial.suggest_int("srsi_length", 6, 15, step = 3)
-        rsi_ma_length: int  = trial.suggest_int("rsi_ma_length", 6, 15, step = 3)
-        hma_diff_ma_length: int = trial.suggest_int("hma_diff_ma_length", 6, 20, step = 2)
-        hma_slow = trial.suggest_int("hma_slow", 20, 50, step = 5)
-        hma_fast = trial.suggest_int("hma_fast", 10, 30, step = 5)
-        natr_length = trial.suggest_int("natr_length", 7, 21, step = 2)
+        ema_1 = trial.suggest_int("ema_1", 10, 40, step = 10)
+        ema_2 = trial.suggest_int("ema_2", 20, 50, step = 10)
+        ema_3 = trial.suggest_int("ema_3", 30, 80, step = 10)
+        ema_4 = trial.suggest_int("ema_4", 40, 100, step = 10)
 
         # Triple Barrier
 
-        time_limit = trial.suggest_int("time_limit", get_time_limit_step(self.interval), get_time_limit_step(self.interval) * 10, step=get_time_limit_step(self.interval))
+        time_limit = None #trial.suggest_int("time_limit", get_time_limit_step(self.interval), get_time_limit_step(self.interval) * 10, step=get_time_limit_step(self.interval))
         cooldown_time = get_time_limit_step(self.interval)
 
-        tp_natr_factor = trial.suggest_float("tp_natr_factor", 0.25, 3, step=0.25)
-        sl_natr_factor = trial.suggest_float("sl_natr_factor", 0.5, 3, step=0.5)
-        # ts_activation_natr_factor = trial.suggest_float("ts_activation_natr_factor", 0.25, 1, step=0.25)
-        # ts_delta_natr_factor = trial.suggest_float("ts_delta_natr_factor", 0.25, 1, step=0.25)
-
+        # TODO: Check maybe trailing stop?
 
         # Creating the instance of the configuration and the controller
-        config = PZScalperControllerConfig(
+        config = PZEmaRibbonTrendControllerConfig(
             connector_name=connector_name,
             trading_pair=self.trading_pair,
             interval=self.interval,
@@ -94,17 +85,11 @@ class PZMMConfigGenerator(BaseStrategyConfigGenerator):
             time_limit=time_limit,
             max_executors_per_side=max_executors_per_side,
             cooldown_time=cooldown_time,
-            natr_length = natr_length,
-            sl_natr_factor=sl_natr_factor,
-            ema_fast=ema_fast,
-            ema_slow=ema_slow,
-            rsi_ma_length=rsi_ma_length,
-            srsi_length=srsi_length,
-            srsi_smoothing=srsi_smoothing,
-            hma_diff_ma_length=hma_diff_ma_length,
-            tp_natr_factor=tp_natr_factor,
-            hma_fast=hma_fast,
-            hma_slow=hma_slow,
+            # natr_length = natr_length,
+            ema_1=ema_1,
+            ema_2=ema_2,
+            ema_3=ema_3,
+            ema_4=ema_4,
         )
 
         # Return the configuration encapsulated in BacktestingConfig
@@ -135,7 +120,7 @@ def run_optimizer_worker(trials: int, start_date, end_date, trading_pair, interv
     start_date_day = start_date.strftime('%Y-%m-%d')
     end_date_day = end_date.strftime('%Y-%m-%d')
     asyncio.run(optimizer.optimize(
-        study_name = f"pz_scalper_{trading_pair}_{interval}_{start_date_day}_{end_date_day}",
+        study_name = f"pz_ema_ribbon_trend_{trading_pair}_{interval}_{start_date_day}_{end_date_day}",
         config_generator=config_generator,
         n_trials=trials,
     ))
