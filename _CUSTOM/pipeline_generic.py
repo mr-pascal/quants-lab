@@ -226,50 +226,59 @@ from hummingbot.strategy_v2.controllers.directional_trading_controller_base impo
 )
 from core.data_structures.backtesting_result import (BacktestingResult)
 
+import traceback
+
+def _run_backtest_task(args):
+    """
+    Helper function to be launched in multiprocessing. Includes detailed logging.
+    """
+    config_serialized, start_ts, end_ts, trade_cost_value, dataset_label = args
+
+    start_dt = datetime.datetime.fromtimestamp(start_ts, tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    end_dt = datetime.datetime.fromtimestamp(end_ts, tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    try:
+        print(f"[{multiprocessing.current_process().name}] 🚀 Starting {dataset_label} backtest from {start_dt} to {end_dt}...")
+
+        from core.backtesting import BacktestingEngine
+        engine = BacktestingEngine(root_path=root_path, load_cached_data=True)
+        result = asyncio.run(engine.run_backtesting(config_serialized, start_ts, end_ts, "1m", trade_cost=trade_cost_value))
+
+        print(f"[{multiprocessing.current_process().name}] ✅ Finished {dataset_label} backtest from {start_dt} to {end_dt}.")
+        return result
+
+    except Exception as e:
+        print(f"[{multiprocessing.current_process().name}] ❌ Error during {dataset_label} backtest: {e}")
+        traceback.print_exc()
+        return None
+
 async def test_optimal_controller_configuration(
-        # TODO: Replace with general "ControllerCOnfigbase" instead of "direcitonal"
-        config: DirectionalTradingControllerConfigBase,
-        train_start_date: datetime.datetime,
-        train_end_date: datetime.datetime,
-        test_start_date: datetime.datetime,
-        test_end_date: datetime.datetime,
-        whole_start_date: datetime.datetime,
-        whole_end_date: datetime.datetime
-        ) -> BacktestingResult:
+    config: DirectionalTradingControllerConfigBase,
+    train_start_date: datetime.datetime,
+    train_end_date: datetime.datetime,
+    test_start_date: datetime.datetime,
+    test_end_date: datetime.datetime,
+    whole_start_date: datetime.datetime,
+    whole_end_date: datetime.datetime
+) -> Dict[str, 'BacktestingResult']:
     """
-        Tests the optimal configuration for
-            - the whole dataset
-            - the train dataset
-            - the test dataset
-        and evaluates the performance on each to see if it's viable to use in production
-
-        Args:
-            config (DirectionalTradingControllerConfigBase): The Controller configuration to backtest
-            train_start_date (datetime.datetime): The start date of the backtesting period for the TRAIN period
-            train_end_date (datetime.datetime): The end date of the backtesting period for the TRAIN period
-            test_start_date (datetime.datetime): The start date of the backtesting period for the TEST period
-            test_end_date (datetime.datetime): The end date of the backtesting period for the TEST period
-            whole_start_date (datetime.datetime): The start date of the backtesting period for the WHOLE period
-            whole_end_date (datetime.datetime): The end date of the backtesting period for the WHOLE period
-
-        Returns:
-            BacktestingResult - The result of the backtest (#FIXME: TYPINGS, object of backtesting result, also in function signature)
+    Runs whole, train, test backtests in parallel processes.
     """
-    from core.backtesting import BacktestingEngine
-    # FIXME: run in parallel, each in a process
-    backtesting = BacktestingEngine(root_path=root_path, load_cached_data=True)
-    print("Start backtesting for WHOLE dataset...")
-    whole_backtesting_result = await backtesting.run_backtesting(config, int(whole_start_date.timestamp()), int(whole_end_date.timestamp()), "1m", trade_cost=float(trade_cost))
-    print("Start backtesting for TRAIN dataset...")
-    train_backtesting_result = await backtesting.run_backtesting(config, int(train_start_date.timestamp()), int(train_end_date.timestamp()), "1m", trade_cost=float(trade_cost))
-    print("Start backtesting for TEST dataset...")
-    test_backtesting_result = await backtesting.run_backtesting(config, int(test_start_date.timestamp()), int(test_end_date.timestamp()), "1m", trade_cost=float(trade_cost))
-    
-    
+    trade_cost_value = float(trade_cost)
+
+    args_list = [
+        (config, int(whole_start_date.timestamp()), int(whole_end_date.timestamp()), trade_cost_value, "WHOLE"),
+        (config, int(train_start_date.timestamp()), int(train_end_date.timestamp()), trade_cost_value, "TRAIN"),
+        (config, int(test_start_date.timestamp()), int(test_end_date.timestamp()), trade_cost_value, "TEST"),
+    ]
+
+    with multiprocessing.Pool(processes=3) as pool:
+        results = pool.map(_run_backtest_task, args_list)
+
     return {
-        "whole": whole_backtesting_result,
-        "train": train_backtesting_result,
-        "test": test_backtesting_result
+        "whole": results[0],
+        "train": results[1],
+        "test": results[2],
     }
 
 async def main():
@@ -302,7 +311,6 @@ async def main():
     
     optimal_controller_configuration = generate_controller_config(df=optimal_configuration, controller_class=controller_class, dynamic_fields=dynamic_fields)
 
-    print(optimal_controller_configuration)
     results = await test_optimal_controller_configuration(
         optimal_controller_configuration,
         train_start_date = train_start_date,
