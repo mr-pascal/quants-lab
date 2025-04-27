@@ -7,7 +7,10 @@ import multiprocessing
 import datetime
 from decimal import Decimal, getcontext
 from typing import Optional, Dict
-
+# Force set correct PATH and CONDA env manually inside all multiprocessing workers
+os.environ["PATH"] = "/opt/miniconda/envs/quants-lab/bin:" + os.environ["PATH"]
+os.environ["CONDA_DEFAULT_ENV"] = "quants-lab"
+os.environ["CONDA_PREFIX"] = "/opt/miniconda/envs/quants-lab"
 # Set path
 root_path = os.path.abspath(os.path.join(os.getcwd(), '../'))
 sys.path.append(root_path)
