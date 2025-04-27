@@ -21,10 +21,7 @@ from core.backtesting.optimizer import BacktestingConfig, BaseStrategyConfigGene
 from decimal import Decimal
 import datetime
 from controllers.directional_trading.pz_scalper import PZScalperControllerConfig
-
-"""
-TODO: reduce parameters to max 6
-"""
+from controllers.directional_trading.pz_ema_ribbon_trend import PZEmaRibbonTrendControllerConfig
 
 ### GLOBALS
 # maker_fee = Decimal(0.0002)
@@ -41,12 +38,24 @@ DB_CONFIG = {
     'port': 5432,
 }
 
+COMMON_FIELDS = [ "trading_pair", "connector_name","interval", ]
+CONTROLLER_CLASS_MAPPING = {
+        "pz_scalper": {
+            "class": PZScalperControllerConfig,
+            "fields": ["ema_fast", "ema_slow", "srsi_smoothing", "srsi_length", "rsi_ma_length","hma_diff_ma_length","hma_slow", "hma_fast", "natr_length", "time_limit", "tp_natr_factor", "sl_natr_factor","cooldown_time","max_executors_per_side","leverage"]
+        },
+        "pz_ema_ribbon_trend": {
+            "class": PZEmaRibbonTrendControllerConfig,
+            "fields": ["ema_1", "ema_2", "ema_3", "ema_4"],
+        },
+    }
+
 
 def get_time_limit_step(input):
     minutes = int(input.split("m")[0])
     return minutes * 60
 
-def fetch_trials(study_id: int):
+def fetch_trials(study_id: int, dynamic_fields):
     """
     Fetch trials for study ID from Database
 
@@ -70,7 +79,7 @@ def fetch_trials(study_id: int):
     JOIN trial_values tv ON t.trial_id = tv.trial_id
     JOIN trial_user_attributes tua ON t.trial_id = tua.trial_id
     WHERE t.study_id = {study_id}
-    AND tua.key IN ('config', 'total_positions', 'accuracy_long', 'accuracy_short', 'max_drawdown_pct', 'net_pnl')
+    AND tua.key IN ('config', 'interval', 'total_positions', 'accuracy_long', 'accuracy_short', 'max_drawdown_pct', 'net_pnl')
     AND tv.value > -2
     ORDER BY value DESC
     """
@@ -78,14 +87,7 @@ def fetch_trials(study_id: int):
 
     # FIXME: create extra method for this
     parameters_list = []
-
-    # FIXME: make the fields dynamic, based on the strategy!
-    fields_to_extract = [
-        "ema_1","ema_2","ema_3", "ema_4",
-        #   "srsi_smoothing", "srsi_length",  "rsi_ma_length", "hma_diff_ma_length","hma_slow", "hma_fast", "natr_length",
-        #   "time_limit", 
-        #   "tp_natr_factor", "sl_natr_factor" 
-          ]
+    
     # Process each row and merge rows by trial_id
     parameters_by_trial = {}
 
@@ -97,7 +99,7 @@ def fetch_trials(study_id: int):
             if attr_key == "config":
                 # The config field contains the JSON with the parameters to extract (double-encoded)
                 parsed_json = json.loads(json.loads(raw_value_json))
-                for field in fields_to_extract:
+                for field in dynamic_fields:
                     entry[field] = parsed_json.get(field)
                 entry["sharpe"] = value
             elif attr_key == "total_positions":
@@ -133,7 +135,7 @@ def fetch_trials(study_id: int):
     unique_params = deduplicate_with_float_tolerance(parameters_list)
     return unique_params
 
-def cluster_data(trials_df):
+def cluster_data(trials_df, variable_fields):
     """
     Use DBSCAN clustering to get an optimal configuration
 
@@ -144,18 +146,9 @@ def cluster_data(trials_df):
     
     """
     df = trials_df
-    # Select only numeric hyperparameters (adjust if your strategy changes)
-    # FIXME: depends on the strategy!
-    param_cols = [
-        'ema_1', 'ema_2', 'ema_3', 'ema_4', 
-        # 'ema_fast', 'ema_slow', 'srsi_smoothing', 'srsi_length',
-        # 'rsi_ma_length', 'hma_diff_ma_length', 'hma_slow', 'hma_fast',
-        # 'natr_length', 
-        # 'time_limit', 
-        # 'tp_natr_factor', 'sl_natr_factor'
-    ]
+
     # Drop rows with missing values in parameter columns
-    X = df[param_cols].dropna()
+    X = df[variable_fields].dropna()
 
     # Standardize parameter values
     scaler = StandardScaler()
@@ -191,127 +184,29 @@ def cluster_data(trials_df):
     print(f"\n✅ Best cluster by Sharpe ratio: {best_cluster}")
 
     # Extract median configuration from best cluster
-    param_median = df[df['cluster'] == best_cluster][param_cols].median()
+    param_median = df[df['cluster'] == best_cluster][variable_fields].median()
     print("\n📌 Median hyperparameters from best cluster:")
     print(param_median)
     return param_median
 
 
-def generate_controller_config(df):
-    # FIXME types, arguments, parameters, return values
-    """
-    Generates a controller configuration based on inputted config data
+def generate_controller_config(df, controller_class, dynamic_fields):
 
-    Args:
-        df: 
-        ema_fast               50
-        ema_slow              110
-        srsi_smoothing          4
-        srsi_length             9
-        rsi_ma_length          15
-        hma_diff_ma_length     18
-        hma_slow               30
-        hma_fast               15
-        natr_length            19
-        time_limit           9000
-        tp_natr_factor       0.25
-        sl_natr_factor        2.5
-        dtype: float64
-    """
+    total_amount_quote = Decimal(1000)
 
+    # Assemble dynamic kwargs
+    dynamic_kwargs = {field: df[field] for field in dynamic_fields if field in df}
 
-
-
-    # FIXME: Just as an idea, to make this configurable based on some inital configuraiton,a lso regarding the fields?
-    # MY_VAR_1 = "pz_scalper"
-    # MY_VAR_2 = "PZConfigController"
-
-    # # This is the string of the full module path (like a dotted import)
-    # module_path = f"controllers.directional_trading.{MY_VAR_1}"
-    # import importlib
-
-    # # Import the module
-    # module = importlib.import_module(module_path)
-
-    # # Get the class from the module
-    # my_class = getattr(module, MY_VAR_2)
-
-    # # Now you can use it like a normal class
-    # instance = my_class()
-
-    # try:
-    #     module = importlib.import_module(module_path)
-    #     my_class = getattr(module, MY_VAR_2)
-    # except (ImportError, AttributeError) as e:
-    #     print(f"Failed to import: {e}")
-    from controllers.directional_trading.pz_scalper import PZScalperControllerConfig
-    from controllers.directional_trading.pz_ema_ribbon_trend import PZEmaRibbonTrendControllerConfig
-    # FIXME: take values from "config" parameter
-
-    # Controller configuration
-    # FIXME: get controller_name, trading_pair and interval as input!
-    connector_name = "binance_perpetual"
-    trading_pair = "SOL-USDT"
-    interval = "15m"
-
-    # Don't matter
-    cooldown_time = get_time_limit_step(interval) #60 * 15
-    take_profit = 5 # 100%, -> Disable Take profit, let the trailing do it's job
-    stop_loss = 5
-
-    # General
-    total_amount_quote: int = 1000
-    max_executors_per_side: int = 1 # TODO: get this also from "df"
-
-
-    # Indicator Values
-    ema_1: int = df["ema_1"]
-    ema_2: int = df["ema_2"]
-    ema_3: int = df["ema_3"]
-    ema_4: int = df["ema_4"]
-    # srsi_smoothing: int = df["srsi_smoothing"]
-    # srsi_length: int = df["srsi_length"]
-    # rsi_ma_length: int  = df["rsi_ma_length"]
-    # hma_diff_ma_length: int = df["hma_diff_ma_length"]
-    # hma_fast: int = df["hma_fast"]
-    # hma_slow: int = df["hma_slow"]
-    # natr_length: int = df["natr_length"]
-
-    # Triple Barrier
-    # time_limit: int = df["time_limit"]
-    # tp_natr_factor = df["tp_natr_factor"]
-    # sl_natr_factor = df["sl_natr_factor"]
-    ###
-
-
-    # Creating the instance of the configuration and the controller
-    return PZEmaRibbonTrendControllerConfig(
-        connector_name=connector_name,
-        leverage=20,
-        trading_pair=trading_pair,
-        interval=interval,
-        take_profit=Decimal(take_profit),
-        stop_loss=Decimal(stop_loss),
-        total_amount_quote=Decimal(total_amount_quote),
-        # time_limit=time_limit,
-        max_executors_per_side=max_executors_per_side,
-        cooldown_time=cooldown_time,
-        ema_1=ema_1,
-        ema_2=ema_2,
-        ema_3=ema_3,
-        ema_4=ema_4,
-        # natr_length = natr_length,
-        # sl_natr_factor=sl_natr_factor,
-        # tp_natr_factor=tp_natr_factor,
-        # ema_fast=ema_fast,
-        # ema_slow=ema_slow,
-        # rsi_ma_length=rsi_ma_length,
-        # srsi_length=srsi_length,
-        # srsi_smoothing=srsi_smoothing,
-        # hma_diff_ma_length=hma_diff_ma_length,
-        # hma_fast=hma_fast,
-        # hma_slow=hma_slow
+    # Combine with fixed kwargs
+    config = controller_class(
+        total_amount_quote=total_amount_quote,
+        take_profit=Decimal(5), # UNREALISTIC VALUE
+        stop_loss=Decimal(5), # UNREALISTIC VALUE
+        **dynamic_kwargs
     )
+
+    return config
+
 
 from hummingbot.strategy_v2.controllers.directional_trading_controller_base import (
     DirectionalTradingControllerConfigBase,
@@ -347,7 +242,6 @@ async def test_optimal_controller_configuration(
         Returns:
             BacktestingResult - The result of the backtest (#FIXME: TYPINGS, object of backtesting result, also in function signature)
     """
-    # FIXME: also backtest the whole dataset, the train dataset and the test dataset
     from core.backtesting import BacktestingEngine
     # FIXME: run in parallel, each in a process
     backtesting = BacktestingEngine(root_path=root_path, load_cached_data=True)
@@ -366,33 +260,48 @@ async def test_optimal_controller_configuration(
     }
 
 async def main():
+
+    ## Study Parameters
+    study_id = 223
+    controller_name="pz_scalper"
+
+    # Times
     train_start_date = datetime.datetime(2024,1,1)
-    train_end_date= datetime.datetime(2025,1,1)
-
-    test_start_date= datetime.datetime(2025,1,1)
-    test_end_date= datetime.datetime(2025,3,30)
-
+    train_end_date = datetime.datetime(2025,1,1)
+    test_start_date = train_end_date # datetime.datetime(2025,1,1)
+    test_end_date = datetime.datetime(2025,3,30)
     whole_start_date= train_start_date
     whole_end_date= test_end_date
 
+
+    controller_info = CONTROLLER_CLASS_MAPPING[controller_name]
+    controller_class = controller_info["class"]
+    variable_fields = controller_info["fields"]
+    dynamic_fields = COMMON_FIELDS + controller_info["fields"]
+
   
-    study_id = 765
     # FIXME: create check for study_id != NONE
-    trials = fetch_trials(study_id)
+    trials = fetch_trials(study_id, dynamic_fields=dynamic_fields)
     # Only trades over 100 occurences per year sound reasonable in terms of
     # statistically significant
     trials = [t for t in trials if t["total_positions"] > 50] # TODO: could be part of the SQL Query
-    print(trials)
+    # print(trials)
 
     df_trials = pd.DataFrame(trials)
+    optimal_configuration = cluster_data(trials_df=df_trials, variable_fields=variable_fields)
 
-    optimal_configuration = cluster_data(df_trials)
-
-
+    print("====== OPTIMAL CONFIG ======")
     print(optimal_configuration)
+    print("====== ============== ======")
 
-    optimal_controller_configuration = generate_controller_config(optimal_configuration)
+    optimal_configuration["trading_pair"] = df_trials["trading_pair"].unique()[0]
+    optimal_configuration["interval"] = df_trials["interval"].unique()[0]
+    optimal_configuration["connector_name"] = df_trials["connector_name"].unique()[0]
+    
+    
+    optimal_controller_configuration = generate_controller_config(df=optimal_configuration, controller_class=controller_class, dynamic_fields=dynamic_fields)
 
+    print(optimal_controller_configuration)
     results = await test_optimal_controller_configuration(
         optimal_controller_configuration,
         train_start_date = train_start_date,
@@ -404,15 +313,16 @@ async def main():
         )
 
     # Check for Sharpes, and number of trades 
-    print("TRAIN:")
+    print()
+    print("====== TRAIN ======")
     print(results["train"].get_results_summary())
-    print("------------------")
-    print("TEST:")
+    print("===================")
+    print("====== TEST ======")
     print(results["test"].get_results_summary())
-    print("------------------")
-    print("WHOLE:")
+    print("===================")
+    print("====== WHOLE ======")
     print(results["whole"].get_results_summary())
-    print("------------------")
+    print("===================")
 
 
 if __name__ == "__main__":
