@@ -28,6 +28,19 @@ from controllers.directional_trading.pz_ema_ribbon_trend import PZEmaRibbonTrend
 taker_fee = Decimal(0.0006)
 # Worst case, MKT entry and Stop via MKT order + slippage
 trade_cost: Decimal = 3*taker_fee
+
+
+## Study Parameters
+study_id = 223
+controller_name="pz_scalper"
+
+# Times
+train_start_date = datetime.datetime(2024,1,1)
+train_end_date = datetime.datetime(2025,1,1)
+test_start_date = train_end_date # datetime.datetime(2025,1,1)
+test_end_date = datetime.datetime(2025,3,30)
+whole_start_date= train_start_date
+whole_end_date= test_end_date
 ####
 
 DB_CONFIG = {
@@ -261,17 +274,6 @@ async def test_optimal_controller_configuration(
 
 async def main():
 
-    ## Study Parameters
-    study_id = 223
-    controller_name="pz_scalper"
-
-    # Times
-    train_start_date = datetime.datetime(2024,1,1)
-    train_end_date = datetime.datetime(2025,1,1)
-    test_start_date = train_end_date # datetime.datetime(2025,1,1)
-    test_end_date = datetime.datetime(2025,3,30)
-    whole_start_date= train_start_date
-    whole_end_date= test_end_date
 
 
     controller_info = CONTROLLER_CLASS_MAPPING[controller_name]
@@ -290,14 +292,13 @@ async def main():
     df_trials = pd.DataFrame(trials)
     optimal_configuration = cluster_data(trials_df=df_trials, variable_fields=variable_fields)
 
-    print("====== OPTIMAL CONFIG ======")
-    print(optimal_configuration)
-    print("====== ============== ======")
-
     optimal_configuration["trading_pair"] = df_trials["trading_pair"].unique()[0]
     optimal_configuration["interval"] = df_trials["interval"].unique()[0]
     optimal_configuration["connector_name"] = df_trials["connector_name"].unique()[0]
     
+    print("====== OPTIMAL CONFIG ======")
+    print(optimal_configuration)
+    print("====== ============== ======")
     
     optimal_controller_configuration = generate_controller_config(df=optimal_configuration, controller_class=controller_class, dynamic_fields=dynamic_fields)
 
