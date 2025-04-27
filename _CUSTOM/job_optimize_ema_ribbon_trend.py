@@ -67,7 +67,7 @@ class PZMMConfigGenerator(BaseStrategyConfigGenerator):
         ema_1 = trial.suggest_int("ema_1", 10, 40, step=5)
         ema_2 = trial.suggest_int("ema_2", ema_1 + 5, 50, step=5)  # ema_2 must be greater than ema_1
         ema_3 = trial.suggest_int("ema_3", ema_2 + 5, 80, step=5)  # ema_3 must be greater than ema_2
-        ema_4 = trial.suggest_int("ema_4", ema_3 + 5, 100, step=5)
+        ema_4 = trial.suggest_int("ema_4", ema_3 + 5, 120, step=5)
 
         # Triple Barrier
 
