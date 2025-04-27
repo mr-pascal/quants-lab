@@ -7,10 +7,7 @@ import multiprocessing
 import datetime
 from decimal import Decimal, getcontext
 from typing import Optional, Dict
-# Force set correct PATH and CONDA env manually inside all multiprocessing workers
-os.environ["PATH"] = "/opt/miniconda/envs/quants-lab/bin:" + os.environ["PATH"]
-os.environ["CONDA_DEFAULT_ENV"] = "quants-lab"
-os.environ["CONDA_PREFIX"] = "/opt/miniconda/envs/quants-lab"
+
 # Set path
 root_path = os.path.abspath(os.path.join(os.getcwd(), '../'))
 sys.path.append(root_path)
@@ -114,11 +111,6 @@ def run_optimizer_worker(trials: int, start_date, end_date, trading_pair, interv
     ))
 
 def main():
-    if sys.platform == "win32":
-        multiprocessing.set_start_method("spawn", force=True)
-    else:
-        multiprocessing.set_start_method("forkserver", force=True)
-
     parser = argparse.ArgumentParser(description="Generic Strategy Optimizer")
     parser.add_argument("config", help="The path to the YAML job config file")
 
