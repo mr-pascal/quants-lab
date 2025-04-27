@@ -39,6 +39,77 @@ def get_time_limit_step(interval_str: str) -> int:
     minutes = int(interval_str.rstrip('m'))
     return minutes * 60
 
+class PZScalperConfigGenerator(BaseStrategyConfigGenerator):
+    trading_pair: str = None
+    interval: str = None
+
+    def __init__(self, start_date: datetime.datetime, end_date: datetime.datetime, trading_pair: str, interval: str, config: Optional[Dict] = None):
+        """
+        Initialize with common parameters for backtesting.
+
+        Args:
+            start_date (datetime.datetime): The start date of the backtesting period.
+            end_date (datetime.datetime): The end date of the backtesting period.
+        """
+        self.start = int(start_date.timestamp())
+        self.end = int(end_date.timestamp())
+        self.interval = interval
+        self.trading_pair = trading_pair
+        self.config = config or {}
+
+
+
+    """
+    Strategy configuration generator for PZ MM optimization.
+    """
+    async def generate_config(self, trial) -> BacktestingConfig:
+        # General
+        total_amount_quote = Decimal(1000)
+        max_executors_per_side = 1
+       
+        # Indicator Values
+        ema_fast = trial.suggest_int("ema_fast", 20, 70, step = 10)
+        ema_slow = trial.suggest_int("ema_slow", 50, 120, step = 10)
+        srsi_smoothing: int = trial.suggest_int("srsi_smoothing", 3, 6, step = 1)
+        srsi_length: int = trial.suggest_int("srsi_length", 6, 15, step = 3)
+        rsi_ma_length: int  = trial.suggest_int("rsi_ma_length", 6, 15, step = 3)
+        hma_diff_ma_length: int = trial.suggest_int("hma_diff_ma_length", 6, 20, step = 2)
+        hma_slow = trial.suggest_int("hma_slow", 20, 50, step = 5)
+        hma_fast = trial.suggest_int("hma_fast", 10, 30, step = 5)
+        natr_length = trial.suggest_int("natr_length", 7, 21, step = 2)
+
+        # Triple Barrier
+        time_limit = trial.suggest_int("time_limit", get_time_limit_step(self.interval), get_time_limit_step(self.interval) * 10, step=get_time_limit_step(self.interval))
+        cooldown_time = get_time_limit_step(self.interval)
+
+        tp_natr_factor = trial.suggest_float("tp_natr_factor", 0.25, 3, step=0.25)
+        sl_natr_factor = trial.suggest_float("sl_natr_factor", 0.5, 3, step=0.5)
+
+        # Creating the instance of the configuration and the controller
+        config = PZScalperControllerConfig(
+            connector_name="binance_perpetual",
+            trading_pair=self.trading_pair,
+            interval=self.interval,
+            total_amount_quote=Decimal(total_amount_quote),
+            time_limit=time_limit,
+            max_executors_per_side=max_executors_per_side,
+            cooldown_time=cooldown_time,
+            natr_length = natr_length,
+            sl_natr_factor=sl_natr_factor,
+            ema_fast=ema_fast,
+            ema_slow=ema_slow,
+            rsi_ma_length=rsi_ma_length,
+            srsi_length=srsi_length,
+            srsi_smoothing=srsi_smoothing,
+            hma_diff_ma_length=hma_diff_ma_length,
+            tp_natr_factor=tp_natr_factor,
+            hma_fast=hma_fast,
+            hma_slow=hma_slow,
+        )
+
+        # Return the configuration encapsulated in BacktestingConfig
+        return BacktestingConfig(config=config, start=self.start, end=self.end, trade_cost =float(trade_cost))
+    
 class PZEmaRibbonTrendConfigGenerator(BaseStrategyConfigGenerator):
     """
     Config generator for PZ EMA Ribbon Trend optimization.
@@ -75,6 +146,7 @@ class PZEmaRibbonTrendConfigGenerator(BaseStrategyConfigGenerator):
 
 # Attach generator class into mapping
 CONTROLLER_MAPPING["pz_ema_ribbon_trend"]["generator_class"] = PZEmaRibbonTrendConfigGenerator
+CONTROLLER_MAPPING["pz_scalper"]["generator_class"] = PZScalperConfigGenerator
 
 def run_optimizer_worker(trials: int, start_date, end_date, trading_pair, interval, algorithm_name, db_kwargs):
     """
