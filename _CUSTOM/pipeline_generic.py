@@ -1,4 +1,3 @@
-
 import os
 import sys
 
@@ -31,7 +30,7 @@ trade_cost: Decimal = 3*taker_fee
 
 
 ## Study Parameters
-study_id = 223
+study_id = 827
 controller_name="pz_scalper"
 
 # Times
@@ -295,7 +294,8 @@ async def main():
     trials = fetch_trials(study_id, dynamic_fields=dynamic_fields)
     # Only trades over 100 occurences per year sound reasonable in terms of
     # statistically significant
-    trials = [t for t in trials if t["total_positions"] > 50] # TODO: could be part of the SQL Query
+    # -> Seems like it doesn't matter how many total_positions, it's filtered out automatically by clustering
+    # trials = [t for t in trials if t["total_positions"] > 100] # TODO: could be part of the SQL Query
     # print(trials)
 
     df_trials = pd.DataFrame(trials)
