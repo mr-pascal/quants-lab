@@ -126,9 +126,15 @@ class PZEmaRibbonTrendController(DirectionalTradingControllerBase):
         """
 
         # natr = Decimal(self.processed_data[f"NATR_{self.config.natr_length}"]) / Decimal(100.0)
+        close = Decimal(self.processed_data["close"])
+        ema_4 = Decimal(self.processed_data[f"EMA_{self.config.ema_4}"])
+        sl = Decimal(abs(close/ema_4))
+        # 
+        if sl > Decimal(1.0):
+            sl -= Decimal(-1.0)
 
         # SL = Factor * NATR
-        self.config.stop_loss = None # self.config.sl_natr_factor * natr
+        self.config.stop_loss = Decimal(sl) # self.config.sl_natr_factor * natr
         # TP = Factor * NATR
         self.config.take_profit = None # self.config.tp_natr_factor * natr
         self.config.trailing_stop= None
