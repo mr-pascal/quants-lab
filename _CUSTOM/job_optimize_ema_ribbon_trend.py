@@ -64,10 +64,10 @@ class PZMMConfigGenerator(BaseStrategyConfigGenerator):
         max_executors_per_side = 1
        
         # Indicator Values
-        ema_1 = trial.suggest_int("ema_1", 10, 40, step = 10)
-        ema_2 = trial.suggest_int("ema_2", 20, 50, step = 10)
-        ema_3 = trial.suggest_int("ema_3", 30, 80, step = 10)
-        ema_4 = trial.suggest_int("ema_4", 40, 100, step = 10)
+        ema_1 = trial.suggest_int("ema_1", 10, 40, step=5)
+        ema_2 = trial.suggest_int("ema_2", ema_1 + 5, 50, step=5)  # ema_2 must be greater than ema_1
+        ema_3 = trial.suggest_int("ema_3", ema_2 + 5, 80, step=5)  # ema_3 must be greater than ema_2
+        ema_4 = trial.suggest_int("ema_4", ema_3 + 5, 100, step=5)
 
         # Triple Barrier
 
@@ -146,6 +146,9 @@ if __name__ == "__main__":
     start_date_str = config['timeframe']['start']
     end_date_str = config['timeframe']['end']
 
+    # Extract number of trials
+    number_trials = config['number_trials']
+
     # Convert to datetime if they are date objects
     if isinstance(start_date_str, datetime.date):
         start_date = datetime.datetime.combine(start_date_str, datetime.datetime.min.time())
@@ -192,7 +195,7 @@ if __name__ == "__main__":
     # start_date = datetime.datetime(2024, 1, 1)
     # end_date = datetime.datetime(2025, 1, 1)
 
-    total_trials = 200
+    total_trials = number_trials
     num_processes = multiprocessing.cpu_count() - 2
     trials_per_proc = total_trials // num_processes
 
