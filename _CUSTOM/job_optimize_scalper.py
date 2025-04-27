@@ -161,6 +161,9 @@ if __name__ == "__main__":
     start_date_str = config['timeframe']['start']
     end_date_str = config['timeframe']['end']
 
+    # Extract number of trials
+    number_trials = config['number_trials']
+
     # Convert to datetime if they are date objects
     if isinstance(start_date_str, datetime.date):
         start_date = datetime.datetime.combine(start_date_str, datetime.datetime.min.time())
@@ -207,7 +210,7 @@ if __name__ == "__main__":
     # start_date = datetime.datetime(2024, 1, 1)
     # end_date = datetime.datetime(2025, 1, 1)
 
-    total_trials = 200
+    total_trials = number_trials
     num_processes = multiprocessing.cpu_count() - 2
     trials_per_proc = total_trials // num_processes
 
