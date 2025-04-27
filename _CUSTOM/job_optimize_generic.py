@@ -141,8 +141,18 @@ def main():
     }
 
     # Timeframe
-    start_date = datetime.datetime.strptime(config["timeframe"]["start"], "%Y-%m-%d")
-    end_date = datetime.datetime.strptime(config["timeframe"]["end"], "%Y-%m-%d")
+    start_raw = config["timeframe"]["start"]
+    end_raw = config["timeframe"]["end"]
+
+    if isinstance(start_raw, datetime.date) and not isinstance(start_raw, datetime.datetime):
+        start_date = datetime.datetime.combine(start_raw, datetime.time.min)
+    else:
+        start_date = datetime.datetime.strptime(start_raw, "%Y-%m-%d")
+
+    if isinstance(end_raw, datetime.date) and not isinstance(end_raw, datetime.datetime):
+        end_date = datetime.datetime.combine(end_raw, datetime.time.min)
+    else:
+        end_date = datetime.datetime.strptime(end_raw, "%Y-%m-%d")
 
     num_processes = multiprocessing.cpu_count()
     trials_per_proc = number_trials // num_processes
