@@ -21,6 +21,7 @@ from decimal import Decimal
 import datetime
 from controllers.directional_trading.pz_scalper import PZScalperControllerConfig
 from controllers.directional_trading.pz_ema_ribbon_trend import PZEmaRibbonTrendControllerConfig
+import argparse
 
 ### GLOBALS
 # maker_fee = Decimal(0.0002)
@@ -29,9 +30,7 @@ taker_fee = Decimal(0.0006)
 trade_cost: Decimal = 3*taker_fee
 
 
-## Study Parameters
-study_id = 827
-controller_name="pz_scalper"
+
 
 # Times
 train_start_date = datetime.datetime(2024,1,1)
@@ -281,7 +280,17 @@ async def test_optimal_controller_configuration(
     }
 
 async def main():
+    parser = argparse.ArgumentParser(description="A optimizer script")
+    parser.add_argument("study_id", help="The ID of the study")
+    parser.add_argument("cname", help="The name of the controller")
 
+    args = parser.parse_args()
+    study_id = args.study_id
+    controller_name = args.cname
+
+    ## Study Parameters
+    # study_id = 827
+    # controller_name="pz_scalper"
 
 
     controller_info = CONTROLLER_CLASS_MAPPING[controller_name]
@@ -305,10 +314,6 @@ async def main():
     optimal_configuration["interval"] = df_trials["interval"].unique()[0]
     optimal_configuration["connector_name"] = df_trials["connector_name"].unique()[0]
     
-    print("====== OPTIMAL CONFIG ======")
-    print(optimal_configuration)
-    print("====== ============== ======")
-    
     optimal_controller_configuration = generate_controller_config(df=optimal_configuration, controller_class=controller_class, dynamic_fields=dynamic_fields)
 
     results = await test_optimal_controller_configuration(
@@ -323,15 +328,18 @@ async def main():
 
     # Check for Sharpes, and number of trades 
     print()
-    print("====== TRAIN ======")
+    print("|====== TRAIN ======")
     print(results["train"].get_results_summary())
-    print("===================")
-    print("====== TEST ======")
+    print("|===================")
+    print("|====== TEST ======")
     print(results["test"].get_results_summary())
-    print("===================")
-    print("====== WHOLE ======")
+    print("|===================")
+    print("|====== WHOLE ======")
     print(results["whole"].get_results_summary())
-    print("===================")
+    print("|===================")
+    print("|====== OPTIMAL CONFIG ======")
+    print(optimal_configuration)
+    print("|====== ============== ======")
 
 
 if __name__ == "__main__":
