@@ -38,8 +38,8 @@ class PZScalperControllerConfig(DirectionalTradingControllerConfigBase):
     natr_length: int = 14
 
     # Factor inputs
-    tp_natr_factor: Decimal = 1.0
-    sl_natr_factor: Decimal = 3.0
+    tp_natr_factor: Decimal = Decimal(1.0)
+    sl_natr_factor: Decimal = Decimal(3.0)
 
     @validator("candles_connector", pre=True, always=True)
     def set_candles_connector(cls, v, values):
