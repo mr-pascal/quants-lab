@@ -105,26 +105,29 @@ class VolAdaptiveMMController(MarketMakingControllerBase):
 
         # Combine trend and momentum signals
         signal_multiplier = (trend_signal + srsi_signal) / 2
+        signal_multiplier = 1.0
         price_adjustment = signal_multiplier * natr * 0.8
-        reference_price = candles["close"] * (1 + price_adjustment)
 
-        print(f"[DEBUG] Last close price: {candles['close'].iloc[-1]:.4f}")
-        print(f"[DEBUG] NATR (volatility): {natr.iloc[-1]:.6f}")
+        price_multiplier = price_adjustment.iloc[-1]
+        reference_price = candles["close"] * (1 + price_multiplier)
+
+        print(f"[DEBUG] Last close price: {candles['close'].iloc[-1]:.6f}")
+        print(f"[DEBUG] NATR (volatility): {(natr.iloc[-1] * 100):.4f}%")
         print(f"[DEBUG] Trend signal: {trend_signal.iloc[-1]}")
         print(f"[DEBUG] StochRSI signal: {srsi_signal.iloc[-1]}")
-        print(f"[DEBUG] Price adjustment (%): {(price_adjustment.iloc[-1] * 100):.4f}%")
-        print(f"[DEBUG] Reference price: {reference_price.iloc[-1]:.4f}")
+        # print(f"[DEBUG] Signal Multiplier: {signal_multiplier.iloc[-1]}")
+        print(f"[DEBUG] Price Multiplier (%): {(price_multiplier * 100):.4f}%")
+        print(f"[DEBUG] Reference price: {reference_price.iloc[-1]:.6f}")
 
-
-        natr = float(natr.iloc[-1])  # force float
-        signal_value = float(signal_multiplier.iloc[-1])
-        # reference_price_value = float(reference_price.iloc[-1])
 
         candles = candles.copy()
 
         candles["spread_multiplier"] = natr
-        candles["reference_price"] = reference_price # candles["close"]
-        candles["price_multiplier"] = 0
+        candles["reference_price"] = reference_price
+        candles["trend_signal"] = trend_signal
+        
+        # candles["close"] # reference_price_value
+        # candles["price_multiplier"] = price_multiplier
         # candles["signal_multiplier"] = signal_multiplier
 
         self.processed_data = {
@@ -135,7 +138,8 @@ class VolAdaptiveMMController(MarketMakingControllerBase):
 
 
             ### CUSTOM DATA
-            "trend_signal": Decimal(str(signal_value)),
+            # FIXME: replace with "singla multiplier"?
+            "trend_signal": candles["trend_signal"].iloc[-1],
 
         }
 
@@ -152,7 +156,7 @@ class VolAdaptiveMMController(MarketMakingControllerBase):
     #     min_spread = Decimal(self.config.minimum_spread_per_side)
     #     effective_spread = max(base_spread, vol_floor, min_spread)
 
-    #     skew = Decimal("0.2") * self.processed_data["trend_signal"] * effective_spread
+    #     skew = Decimal("0.2") * Decimal(self.processed_data["trend_signal"]) * effective_spread
     #     direction = Decimal("-1") if trade_type == TradeType.BUY else Decimal("1")
     #     order_price = Decimal(self.processed_data["reference_price"]) * Decimal(1 + direction * (effective_spread + skew))
     #     order_amount = Decimal(amounts_quote[int(level)]) / order_price
@@ -174,26 +178,13 @@ class VolAdaptiveMMController(MarketMakingControllerBase):
 
     #     return order_price, order_amount
 
-    # def get_executor_config(self, level_id: str, price: Decimal, amount: Decimal) -> PositionExecutorConfig:
-    #     trade_type = self.get_trade_type_from_level_id(level_id)
-    #     natr = Decimal(self.processed_data["spread_multiplier"])
-    #     self.config.take_profit = Decimal(self.config.minimum_spread_per_side)
-    #     self.config.stop_loss = Decimal("0.5") * natr
-    #     self.config.trailing_stop = None
-
-    #     return PositionExecutorConfig(
-    #         timestamp=self.market_data_provider.time(),
-    #         level_id=level_id,
-    #         connector_name=self.config.connector_name,
-    #         trading_pair=self.config.trading_pair,
-    #         entry_price=price,
-    #         amount=amount,
-    #         triple_barrier_config=self.config.triple_barrier_config,
-    #         leverage=self.config.leverage,
-    #         side=trade_type,
-    #     )
-    def get_executor_config(self, level_id: str, price: Decimal, amount: Decimal):
+    def get_executor_config(self, level_id: str, price: Decimal, amount: Decimal) -> PositionExecutorConfig:
         trade_type = self.get_trade_type_from_level_id(level_id)
+        natr = Decimal(self.processed_data["spread_multiplier"])
+        self.config.take_profit = Decimal(self.config.minimum_spread_per_side)
+        self.config.stop_loss = Decimal("0.5") * natr
+        self.config.trailing_stop = None
+
         return PositionExecutorConfig(
             timestamp=self.market_data_provider.time(),
             level_id=level_id,
@@ -205,3 +196,16 @@ class VolAdaptiveMMController(MarketMakingControllerBase):
             leverage=self.config.leverage,
             side=trade_type,
         )
+    # def get_executor_config(self, level_id: str, price: Decimal, amount: Decimal):
+    #     trade_type = self.get_trade_type_from_level_id(level_id)
+    #     return PositionExecutorConfig(
+    #         timestamp=self.market_data_provider.time(),
+    #         level_id=level_id,
+    #         connector_name=self.config.connector_name,
+    #         trading_pair=self.config.trading_pair,
+    #         entry_price=price,
+    #         amount=amount,
+    #         triple_barrier_config=self.config.triple_barrier_config,
+    #         leverage=self.config.leverage,
+    #         side=trade_type,
+    #     )

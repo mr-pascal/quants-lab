@@ -32,11 +32,18 @@ class BacktestingResult(DataStructureBase):
         total_executors = results["total_executors"]
         accuracy_long = results["accuracy_long"]
         accuracy_short = results["accuracy_short"]
-        take_profit = results["close_types"].get("TAKE_PROFIT", 0)
-        stop_loss = results["close_types"].get("STOP_LOSS", 0)
-        time_limit = results["close_types"].get("TIME_LIMIT", 0)
-        trailing_stop = results["close_types"].get("TRAILING_STOP", 0)
-        early_stop = results["close_types"].get("EARLY_STOP", 0)
+
+        close_types = results.get("close_types", {})
+
+        if not isinstance(close_types, dict):
+            close_types = {}
+
+        take_profit = close_types.get("TAKE_PROFIT", 0)
+        stop_loss = close_types.get("STOP_LOSS", 0)
+        time_limit = close_types.get("TIME_LIMIT", 0)
+        trailing_stop = close_types.get("TRAILING_STOP", 0)
+        early_stop = close_types.get("EARLY_STOP", 0)
+
         return f"""
 Net PNL: ${net_pnl_quote:.2f} ({net_pnl_pct*100:.2f}%) | Max Drawdown: ${max_drawdown:.2f} ({max_drawdown_pct*100:.2f}%)
 Total Volume ($): {total_volume:.2f} | Sharpe Ratio: {sharpe_ratio:.2f} | Profit Factor: {profit_factor:.2f}
@@ -121,28 +128,70 @@ Close Types: Take Profit: {take_profit} | Stop Loss: {stop_loss} | Time Limit: {
         return fig
 
     def get_backtesting_figure(self):
+        from datetime import timedelta
+
         # Create subplots
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
                             vertical_spacing=0.02, subplot_titles=('Candlestick', 'PNL Quote'),
                             row_heights=[0.7, 0.3])
 
-        # Add candlestick trace
-        fig.add_trace(self._get_bt_candlestick_trace(), row=1, col=1)
+        # Ensure datetime index and floor to seconds
+        df = self.processed_data.copy()
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit='s')
+        df.index = df["timestamp"].dt.floor("s")
 
-        # Add executors trace
+        # ➕ Add 1-second price line (blue)
+        fig.add_trace(go.Scatter(x=df.index,
+                                y=df['close'],
+                                mode='lines',
+                                line=dict(color="blue"),
+                                name="1s Close"), row=1, col=1)
+
+
+        # Create 1-minute bins with OHLC
+        df_1min = (
+            df.resample("1min", label="left", closed="left", origin="start", offset="0s")
+            .agg({
+                "open": "first",
+                "high": "max",
+                "low": "min",
+                "close": "last"
+            })
+            .dropna()
+        )
+
+        # (Optional) Visually center the candles if needed
+        df_1min.index = df_1min.index + pd.Timedelta(seconds=15)
+
+        # 🔳 Add a shape (box) per 1-minute bar, covering only that bar's high/low
+        for i, (ts, row) in enumerate(df_1min.iterrows()):
+            fig.add_shape(
+                type="rect",
+                x0=ts - pd.Timedelta(seconds=15),  # back to actual start of interval
+                x1=ts + pd.Timedelta(seconds=45),  # full 60 seconds total width
+                y0=row["low"],
+                y1=row["high"],
+                fillcolor="rgba(255,255,255,0.08)" if i % 2 == 0 else "rgba(255,255,255,0.03)",
+                line=dict(width=0),
+                layer="below"
+            )
+
+        # ➕ Add executors trace
         fig = self._add_executors_trace(fig, self.executors, row=1, col=1)
 
-        # Add PNL trace
+        # ➕ Add PNL trace
         fig.add_trace(self._get_pnl_trace(self.executors), row=2, col=1)
 
-        # Apply the theme layout
+        # 🖼️ Apply layout
         layout_settings = self._get_default_layout(f"Trading Pair: {self.controller_config.dict().get('trading_pair')}")
         layout_settings["showlegend"] = False
         fig.update_layout(**layout_settings)
 
-        # Update axis properties
+        # Axes labels
         fig.update_xaxes(rangeslider_visible=False, row=1, col=1)
-        fig.update_xaxes(row=2, col=1)
         fig.update_yaxes(title_text="Price", row=1, col=1)
         fig.update_yaxes(title_text="PNL", row=2, col=1)
+
         return fig
+
+
